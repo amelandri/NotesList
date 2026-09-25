@@ -3,7 +3,16 @@ import { moment } from "obsidian";
 const WEEKDAYS = 7;
 const RANGE_MONTHS = 6;
 
-export function renderHeatmap(container: HTMLElement, dates: moment.Moment[]): void {
+export interface HeatmapSelection {
+	selectedDate: string | null;
+	onSelectDate: (date: string) => void;
+	selectedMonth: string | null;
+	onSelectMonth: (month: string) => void;
+}
+
+export function renderHeatmap(container: HTMLElement, dates: moment.Moment[], selection: HeatmapSelection): void {
+	const { selectedDate, onSelectDate, selectedMonth, onSelectMonth } = selection;
+
 	const dayCounts = new Map<string, number>();
 	for (const date of dates) {
 		const key = date.format("YYYY-MM-DD");
@@ -30,7 +39,11 @@ export function renderHeatmap(container: HTMLElement, dates: moment.Moment[]): v
 
 		const label = monthsRow.createDiv({ cls: "notes-heatmap-month-label" });
 		if (weekStart.month() !== lastMonth) {
+			const monthKey = weekStart.format("YYYY-MM");
 			label.setText(weekStart.format("MMM"));
+			label.addClass("is-clickable");
+			if (monthKey === selectedMonth) label.addClass("is-selected");
+			label.addEventListener("click", () => onSelectMonth(monthKey));
 			lastMonth = weekStart.month();
 		}
 
@@ -43,10 +56,14 @@ export function renderHeatmap(container: HTMLElement, dates: moment.Moment[]): v
 				continue;
 			}
 
-			const count = dayCounts.get(date.format("YYYY-MM-DD")) ?? 0;
+			const dateKey = date.format("YYYY-MM-DD");
+			const count = dayCounts.get(dateKey) ?? 0;
 			const level = levelFor(count, maxCount);
-			const cell = column.createDiv({ cls: `notes-heatmap-cell level-${level}` });
-			cell.setAttr("title", `${count} note${count === 1 ? "" : "s"} — ${date.format("DD MMM YYYY")}`);
+			const cell = column.createDiv({
+				cls: `notes-heatmap-cell level-${level}` + (dateKey === selectedDate ? " is-selected" : ""),
+			});
+			cell.setAttr("title", `${count} note${count === 1 ? "" : "s"} — ${date.format("D MMM")}`);
+			cell.addEventListener("click", () => onSelectDate(dateKey));
 		}
 	}
 

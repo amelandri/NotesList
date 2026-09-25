@@ -65,7 +65,7 @@
 	min-width: 0;
 }
 
-.notes-list-tag-pill {
+.notes-list-filter-pill {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--size-2-1);
@@ -77,7 +77,7 @@
 	white-space: nowrap;
 }
 
-.notes-list-tag-pill-clear {
+.notes-list-filter-pill-clear {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -89,11 +89,11 @@
 	border-radius: 50%;
 }
 
-.notes-list-tag-pill-clear:hover {
+.notes-list-filter-pill-clear:hover {
 	background-color: var(--background-modifier-active-hover);
 }
 
-.notes-list-tag-pill-clear svg {
+.notes-list-filter-pill-clear svg {
 	width: 10px;
 	height: 10px;
 }
@@ -204,8 +204,12 @@
 }
 
 .notes-heatmap-scroller {
+	/* overflow-x: auto here implicitly makes overflow-y compute to auto too (per
+	   the CSS overflow spec), so edge cells need room on every side, not just
+	   left/right, or their selection outline gets clipped against this box. */
 	overflow-x: auto;
-	padding-bottom: var(--size-2-2);
+	padding: 3px;
+	padding-bottom: calc(3px + var(--size-2-2));
 }
 
 .notes-heatmap-months {
@@ -221,6 +225,19 @@
 	color: var(--text-muted);
 	overflow: visible;
 	white-space: nowrap;
+}
+
+.notes-heatmap-month-label.is-clickable {
+	cursor: pointer;
+}
+
+.notes-heatmap-month-label.is-clickable:hover {
+	color: var(--text-accent-hover);
+}
+
+.notes-heatmap-month-label.is-selected {
+	color: var(--text-accent);
+	font-weight: 600;
 }
 
 .notes-heatmap-grid {
@@ -243,6 +260,20 @@
 
 .notes-heatmap-cell-empty {
 	background-color: transparent;
+}
+
+.notes-heatmap-grid .notes-heatmap-cell:not(.notes-heatmap-cell-empty) {
+	cursor: pointer;
+}
+
+.notes-heatmap-grid .notes-heatmap-cell:not(.notes-heatmap-cell-empty):hover {
+	outline: 1px solid var(--text-muted);
+	outline-offset: 1px;
+}
+
+.notes-heatmap-cell.is-selected {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
 }
 
 .notes-heatmap-cell.level-1 {

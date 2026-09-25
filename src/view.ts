@@ -1,6 +1,6 @@
 import { App, EventRef, ItemView, MarkdownRenderer, Notice, TFile, WorkspaceLeaf, getAllTags, moment, setIcon } from "obsidian";
 import type NotesListPlugin from "./main";
-import { renderHeatmap } from "./heatmap";
+import { renderHeatmap, type HeatmapSelection } from "./heatmap";
 import { buildTagTree, renderTagTree, tagMatchesFilter } from "./tagTree";
 
 export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
@@ -38,6 +38,8 @@ function internalCommands(app: App): CommandsInternal {
 export class NotesListView extends ItemView {
 	private plugin: NotesListPlugin;
 	private selectedTag: string | null = null;
+	private selectedDate: string | null = null;
+	private selectedMonth: string | null = null;
 	private collapsedTagPaths = new Set<string>();
 	private currentPage = 1;
 
@@ -69,6 +71,17 @@ export class NotesListView extends ItemView {
 
 	private isReadableLineWidthEnabled(): boolean {
 		return Boolean(internalVault(this.app).getConfig("readableLineLength"));
+	}
+
+	private renderFilterPill(container: HTMLElement, label: string, clearLabel: string, onClear: () => void): void {
+		const pill = container.createDiv({ cls: "notes-list-filter-pill" });
+		pill.createSpan({ text: label });
+		const clearButton = pill.createEl("button", {
+			cls: "notes-list-filter-pill-clear",
+			attr: { "aria-label": clearLabel, type: "button" },
+		});
+		setIcon(clearButton, "x");
+		clearButton.addEventListener("click", onClear);
 	}
 
 	private createUniqueNote(): void {
@@ -139,9 +152,12 @@ export class NotesListView extends ItemView {
 
 		allEntries.sort((a, b) => b.date.valueOf() - a.date.valueOf());
 
-		const visibleEntries = this.selectedTag
-			? allEntries.filter((entry) => entry.tags.some((tag) => tagMatchesFilter(tag, this.selectedTag!)))
-			: allEntries;
+		const visibleEntries = allEntries.filter((entry) => {
+			const matchesTag = !this.selectedTag || entry.tags.some((tag) => tagMatchesFilter(tag, this.selectedTag!));
+			const matchesDate = !this.selectedDate || entry.date.format("YYYY-MM-DD") === this.selectedDate;
+			const matchesMonth = !this.selectedMonth || entry.date.format("YYYY-MM") === this.selectedMonth;
+			return matchesTag && matchesDate && matchesMonth;
+		});
 
 		const container = this.contentEl;
 		container.empty();
@@ -158,18 +174,32 @@ export class NotesListView extends ItemView {
 		titleGroup.createEl("h4", { text: "Notes", cls: "notes-list-panel-title" });
 
 		if (this.selectedTag) {
-			const pill = titleGroup.createDiv({ cls: "notes-list-tag-pill" });
-			pill.createSpan({ text: `#${this.selectedTag}` });
-			const clearButton = pill.createEl("button", {
-				cls: "notes-list-tag-pill-clear",
-				attr: { "aria-label": "Clear tag filter", type: "button" },
-			});
-			setIcon(clearButton, "x");
-			clearButton.addEventListener("click", () => {
+			this.renderFilterPill(titleGroup, `#${this.selectedTag}`, "Clear tag filter", () => {
 				this.selectedTag = null;
 				this.currentPage = 1;
 				void this.refresh();
 			});
+		}
+
+		if (this.selectedDate) {
+			this.renderFilterPill(titleGroup, moment(this.selectedDate).format("D MMM YYYY"), "Clear date filter", () => {
+				this.selectedDate = null;
+				this.currentPage = 1;
+				void this.refresh();
+			});
+		}
+
+		if (this.selectedMonth) {
+			this.renderFilterPill(
+				titleGroup,
+				moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY"),
+				"Clear month filter",
+				() => {
+					this.selectedMonth = null;
+					this.currentPage = 1;
+					void this.refresh();
+				}
+			);
 		}
 
 		const newNoteButton = header.createEl("button", {
@@ -181,9 +211,7 @@ export class NotesListView extends ItemView {
 
 		if (visibleEntries.length === 0) {
 			mainEl.createEl("p", {
-				text: this.selectedTag
-					? `No notes tagged #${this.selectedTag}.`
-					: "No notes found in the configured folder.",
+				text: this.buildEmptyMessage(),
 				cls: "notes-list-empty",
 			});
 		} else {
@@ -205,9 +233,24 @@ export class NotesListView extends ItemView {
 		}
 
 		heatmapPanel.createEl("h4", { text: "Activity", cls: "notes-list-panel-title" });
+		const heatmapSelection: HeatmapSelection = {
+			selectedDate: this.selectedDate,
+			onSelectDate: (date) => {
+				this.selectedDate = date;
+				this.currentPage = 1;
+				void this.refresh();
+			},
+			selectedMonth: this.selectedMonth,
+			onSelectMonth: (month) => {
+				this.selectedMonth = month;
+				this.currentPage = 1;
+				void this.refresh();
+			},
+		};
 		renderHeatmap(
 			heatmapPanel.createDiv(),
-			allEntries.map((e) => e.date)
+			allEntries.map((e) => e.date),
+			heatmapSelection
 		);
 
 		const tagPanel = heatmapPanel.createDiv({ cls: "notes-tag-tree-panel" });
@@ -230,6 +273,19 @@ export class NotesListView extends ItemView {
 				void this.refresh();
 			}
 		);
+	}
+
+	private buildEmptyMessage(): string {
+		const tagPart = this.selectedTag ? `tagged #${this.selectedTag}` : "";
+		const datePart = this.selectedDate ? `on ${moment(this.selectedDate).format("D MMM YYYY")}` : "";
+		const monthPart = this.selectedMonth
+			? `in ${moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY")}`
+			: "";
+		const parts = [tagPart, datePart, monthPart].filter(Boolean);
+
+		if (parts.length === 0) return "No notes found in the configured folder.";
+
+		return `No notes ${parts.join(" ")}.`;
 	}
 
 	private renderPagination(container: HTMLElement, totalPages: number): void {
