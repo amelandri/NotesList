@@ -1,0 +1,23 @@
+{
+	"name": "notes-list",
+	"version": "1.0.0",
+	"description": "Obsidian plugin: chronological list of notes in a folder, with date/time, content and tags",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"install-to-vault": "node copy-to-vault.mjs",
+		"deploy": "npm run build && npm run install-to-vault"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^20.11.5",
+		"builtin-modules": "^3.3.0",
+		"esbuild": "^0.20.0",
+		"obsidian": "^1.5.7",
+		"tslib": "2.6.2",
+		"typescript": "^5.3.3"
+	}
+}

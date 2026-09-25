@@ -1,0 +1,215 @@
+.notes-list-view {
+	/* The scrolling container itself: no padding here, so the scrollbar the
+	   browser draws for this overflow sits flush at the pane's real edge,
+	   the same way Obsidian's own reading/editing views keep their scrollbar
+	   outside the content's inset (see .notes-list-layout for that inset). */
+	height: 100%;
+	overflow-y: auto;
+}
+
+.notes-list-layout {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--size-4-6);
+	padding: var(--size-4-4) !important;
+}
+
+.notes-list-main {
+	flex: 2 1 0;
+	min-width: 0;
+}
+
+/* Mirrors Obsidian core's own is-readable-line-width mechanism (see
+   .markdown-preview-view.is-readable-line-width in the app's own CSS): the
+   max-width rule only applies when the class is present, otherwise the
+   column takes its full flex share with no cap. */
+.notes-list-main.is-readable-line-width {
+	max-width: var(--file-line-width);
+	margin: 0 auto;
+}
+
+.notes-list-heatmap-panel {
+	/* Never shrinks below its own content width — .notes-list-main (flex-grow,
+	   min-width: 0) absorbs the squeeze first, so the heatmap stays intact.
+	   Sticky against .notes-list-view's own scroll (the whole layout scrolls
+	   as one block, scrollbar included, rather than this column scrolling on
+	   its own), so it stays pinned and fully visible as the notes scroll by.
+	   top matches .notes-list-layout's padding-top: the panel already sits
+	   there before any scrolling, so it locks in place immediately instead of
+	   sliding up by that amount before catching. */
+	flex: 0 0 auto;
+	position: sticky;
+	top: var(--size-4-4);
+}
+
+.notes-list-panel-title {
+	margin: 0 0 var(--size-4-2) 0;
+}
+
+.notes-list-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--size-4-2);
+	margin-bottom: var(--size-4-2);
+}
+
+.notes-list-header .notes-list-panel-title {
+	margin: 0;
+}
+
+.notes-list-new-note-button {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border-radius: 50%;
+	background-color: var(--background-modifier-hover);
+	color: var(--icon-color);
+}
+
+.notes-list-new-note-button:hover {
+	background-color: var(--background-modifier-active-hover);
+	color: var(--icon-color-hover);
+}
+
+.notes-list-new-note-button svg {
+	width: 14px;
+	height: 14px;
+}
+
+.notes-list-item {
+	padding: 1.3rem 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.notes-list-item:first-child {
+	padding-top: 0;
+}
+
+.notes-list-item:last-child {
+	border-bottom: none;
+}
+
+.notes-list-datetime {
+	display: inline-block;
+	font-size: var(--font-ui-small);
+	color: var(--text-accent);
+	text-decoration: none;
+	margin-bottom: var(--size-2-2);
+}
+
+.notes-list-datetime:hover {
+	text-decoration: underline;
+}
+
+.notes-list-content {
+	color: color-mix(in srgb, var(--text-normal) 80%, transparent);
+}
+
+.notes-list-content > *:first-child {
+	margin-top: 0;
+}
+
+.notes-list-content > *:last-child {
+	margin-bottom: 0;
+}
+
+.notes-list-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-2-2);
+	margin-top: var(--size-2-2);
+}
+
+.notes-list-tag {
+	font-size: var(--font-ui-smaller);
+	color: var(--tag-color, var(--text-accent));
+	background: var(--tag-background, var(--background-modifier-hover));
+	border-radius: var(--radius-s);
+	padding: 0 var(--size-2-2);
+}
+
+.notes-list-empty {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.notes-heatmap-scroller {
+	overflow-x: auto;
+	padding-bottom: var(--size-2-2);
+}
+
+.notes-heatmap-months {
+	display: flex;
+	gap: 3px;
+	margin-bottom: var(--size-2-1);
+}
+
+.notes-heatmap-month-label {
+	flex: 0 0 10px;
+	width: 10px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	overflow: visible;
+	white-space: nowrap;
+}
+
+.notes-heatmap-grid {
+	display: flex;
+	gap: 3px;
+}
+
+.notes-heatmap-week {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.notes-heatmap-cell {
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	background-color: var(--background-modifier-border);
+}
+
+.notes-heatmap-cell-empty {
+	background-color: transparent;
+}
+
+.notes-heatmap-cell.level-1 {
+	background-color: var(--interactive-accent);
+	opacity: 0.25;
+}
+
+.notes-heatmap-cell.level-2 {
+	background-color: var(--interactive-accent);
+	opacity: 0.5;
+}
+
+.notes-heatmap-cell.level-3 {
+	background-color: var(--interactive-accent);
+	opacity: 0.75;
+}
+
+.notes-heatmap-cell.level-4 {
+	background-color: var(--interactive-accent);
+	opacity: 1;
+}
+
+.notes-heatmap-legend {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	margin-top: var(--size-2-2);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.notes-heatmap-legend .notes-heatmap-cell {
+	width: 10px;
+	height: 10px;
+}

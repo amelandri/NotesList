@@ -1,0 +1,138 @@
+import { App, Plugin, PluginSettingTab, Setting, TAbstractFile, WorkspaceLeaf, debounce } from "obsidian";
+import { DEFAULT_SETTINGS, NotesListSettings } from "./settings";
+import { FolderSuggest } from "./folderSuggest";
+import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
+
+export default class NotesListPlugin extends Plugin {
+	settings!: NotesListSettings;
+
+	private requestRefresh = debounce(
+		() => {
+			for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_NOTES_LIST)) {
+				const view = leaf.view;
+				if (view instanceof NotesListView) void view.refresh();
+			}
+		},
+		300,
+		true
+	);
+
+	async onload(): Promise<void> {
+		await this.loadSettings();
+
+		this.registerView(VIEW_TYPE_NOTES_LIST, (leaf) => new NotesListView(leaf, this));
+
+		this.addRibbonIcon("list-ordered", "Open Notes List", () => {
+			void this.activateView();
+		});
+
+		this.addCommand({
+			id: "open-notes-list",
+			name: "Open Notes List",
+			callback: () => {
+				void this.activateView();
+			},
+		});
+
+		this.addSettingTab(new NotesListSettingTab(this.app, this));
+
+		this.registerEvent(this.app.vault.on("modify", (f: TAbstractFile) => this.onVaultEvent(f)));
+		this.registerEvent(this.app.vault.on("create", (f: TAbstractFile) => this.onVaultEvent(f)));
+		this.registerEvent(this.app.vault.on("delete", (f: TAbstractFile) => this.onVaultEvent(f)));
+		this.registerEvent(this.app.vault.on("rename", (f: TAbstractFile) => this.onVaultEvent(f)));
+		this.registerEvent(this.app.metadataCache.on("changed", (f: TAbstractFile) => this.onVaultEvent(f)));
+	}
+
+	onunload(): void {
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_NOTES_LIST);
+	}
+
+	private onVaultEvent(file: TAbstractFile): void {
+		const folderPath = this.settings.folderPath.replace(/^\/+|\/+$/g, "");
+		if (folderPath === "" || file.path.startsWith(folderPath)) {
+			this.requestRefresh();
+		}
+	}
+
+	async activateView(): Promise<void> {
+		const { workspace } = this.app;
+
+		let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(VIEW_TYPE_NOTES_LIST)[0] ?? null;
+		if (!leaf) {
+			leaf = workspace.getLeaf("tab");
+			await leaf.setViewState({ type: VIEW_TYPE_NOTES_LIST, active: true });
+		}
+		workspace.revealLeaf(leaf);
+	}
+
+	async loadSettings(): Promise<void> {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
+		this.requestRefresh();
+	}
+}
+
+class NotesListSettingTab extends PluginSettingTab {
+	plugin: NotesListPlugin;
+
+	constructor(app: App, plugin: NotesListPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+
+		new Setting(containerEl)
+			.setName("Folder")
+			.setDesc("Vault folder to watch. Empty = entire vault.")
+			.addText((text) => {
+				new FolderSuggest(this.app, text.inputEl);
+				text
+					.setPlaceholder("e.g. Journal")
+					.setValue(this.plugin.settings.folderPath)
+					.onChange(async (value) => {
+						this.plugin.settings.folderPath = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Include subfolders")
+			.setDesc("When enabled, also shows notes in subfolders of the chosen folder.")
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.includeSubfolders).onChange(async (value) => {
+					this.plugin.settings.includeSubfolders = value;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Show tags")
+			.setDesc("Shows each note's tags.")
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.showTags).onChange(async (value) => {
+					this.plugin.settings.showTags = value;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Content preview length")
+			.setDesc("Maximum number of content characters shown per note. 0 = full content.")
+			.addText((text) =>
+				text
+					.setPlaceholder("300")
+					.setValue(String(this.plugin.settings.contentPreviewChars))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						this.plugin.settings.contentPreviewChars = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+						await this.plugin.saveSettings();
+					})
+			);
+	}
+}
