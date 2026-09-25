@@ -27,7 +27,12 @@ There are no automated tests and no linter configured.
 
 ### Note dating convention
 
-A note's date/time is derived from its **filename**, not frontmatter: `resolveDate()` in `view.ts` parses `file.basename` strictly against `YYYYMMDDHHmm` (moment, strict mode) and falls back to `file.stat.ctime` only if that parse fails. This is the same filename format produced by Obsidian's "Unique note creator" core plugin (see below), so the two features are designed to work together. The heatmap consumes the same resolved dates, so it always agrees with the list's ordering.
+A note's date/time comes from its **frontmatter**: `resolveDate()` in `view.ts` reads the `date` and `time` frontmatter properties via `metadataCache.getFileCache(file)?.frontmatter`. Both fields are handled defensively because Obsidian's frontmatter YAML parser uses **YAML 1.1** resolvers (confirmed by extracting and inspecting the app's own bundled `app.js`, and reproduced directly with the `yaml` npm package under `{ schema: "yaml-1.1" }`), which silently auto-cast unquoted scalars that look like something else:
+
+- An unquoted `date: 2026-09-25` resolves to a native JS **`Date`** object (UTC midnight), not a string. `moment(fm.date)` accepts a `Date` directly, so this is fine, but `.startOf("day")` is required afterwards regardless — a `Date`'s `toString()` is timezone-shifted and not reliably midnight, so this is also what guarantees the 00:00 default when `time` is absent.
+- An unquoted `time: 16:20` matches YAML 1.1's **sexagesimal (base-60) integer** grammar (`[0-9]+(:[0-5]?[0-9])+`) and resolves to the **number `980`** (`16*60+20`), not the string `"16:20"`. `parseFrontmatterTime()` handles both shapes: a number is decoded back as `hour = floor(n/60), minute = n%60`; a string (or anything else) is parsed strictly against `["HH:mm", "HH:mm:ss"]`. An earlier version of this code only handled the string case, so `time` was silently ignored for every note — quoting the value in frontmatter (`time: "16:20"`) also avoids the sexagesimal resolver entirely, but the plugin no longer depends on the user doing that.
+
+If `date` is missing, or doesn't parse, `resolveDate()` falls back to `file.stat.mtime` (last-modified time, not creation time — an edit with no explicit `date`/`time` set will keep shifting the note's position in the list and its heatmap day). The heatmap consumes the same resolved dates, so it always agrees with the list's ordering. Note this is unrelated to the filename format "Unique note creator" produces (see below) — that dependency is only about note *creation*, not dating.
 
 ### Dependency on the "Unique note creator" core plugin
 

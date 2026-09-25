@@ -92,10 +92,41 @@ export class NotesListView extends ItemView {
 	}
 
 	private resolveDate(file: TFile): moment.Moment {
-		const parsed = moment(file.basename, "YYYYMMDDHHmm", true);
-		if (parsed.isValid()) return parsed;
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
 
-		return moment(file.stat.ctime);
+		// fm.date may be a plain string, or a native Date object — YAML auto-casts an
+		// unquoted YYYY-MM-DD scalar to one. moment(...) accepts either; startOf("day")
+		// pins it to local midnight regardless (a Date's toString() is timezone-shifted
+		// and not reliably midnight on its own), giving the 00:00 default with no time.
+		const date = fm?.date ? moment(fm.date).startOf("day") : null;
+
+		if (date?.isValid()) {
+			const time = this.parseFrontmatterTime(fm?.time);
+			if (time) date.set(time);
+			return date;
+		}
+
+		return moment(file.stat.mtime);
+	}
+
+	// fm.time is usually an "HH:mm"/"HH:mm:ss" string, but an unquoted "HH:MM"-shaped
+	// scalar (e.g. "16:20") is legacy-YAML for a base-60 integer — 16*60+20 = 980 — not
+	// a time string, so Obsidian's frontmatter cache hands that back as the number 980.
+	// Both forms are handled here rather than assuming the field is always a string.
+	private parseFrontmatterTime(value: unknown): { hour: number; minute: number; second: number } | null {
+		if (typeof value === "number" && Number.isFinite(value)) {
+			const totalMinutes = Math.trunc(value);
+			return { hour: Math.floor(totalMinutes / 60) % 24, minute: totalMinutes % 60, second: 0 };
+		}
+
+		if (value) {
+			const parsed = moment(String(value), ["HH:mm", "HH:mm:ss"], true);
+			if (parsed.isValid()) {
+				return { hour: parsed.hour(), minute: parsed.minute(), second: parsed.second() };
+			}
+		}
+
+		return null;
 	}
 
 	async refresh(): Promise<void> {

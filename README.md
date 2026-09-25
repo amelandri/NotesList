@@ -10,7 +10,7 @@ An [Obsidian](https://obsidian.md) plugin that opens a custom view showing every
 
 - **Configurable folder** — pick any vault folder to watch (with autocomplete), optionally including its subfolders.
 - **Chronological note list** — every note in scope, sorted newest first, each entry showing:
-  - **date and time**, derived from the note's filename (see [Dependency](#dependency-unique-note-creator) below), rendered as a clickable link to the note;
+  - **date and time**, read from the note's `date`/`time` frontmatter properties, falling back to the file's last-modified time if those aren't set, rendered as a clickable link to the note;
   - the note's **rendered content** (full or truncated to a configurable character length).
 - **Pagination** — the list is split into pages (size configurable, default 10). Page navigation appears at the bottom of the list only when there's more than one page: previous/next buttons plus up to 5 page numbers, kept centered around the current page as you move through a long list. Only the notes on the current page have their content actually read and rendered, so browsing a large folder stays fast regardless of how many notes are in scope.
 - **New Note button** — a small circular `+` button next to the list title creates a new, uniquely-named note in one click (see [Dependency](#dependency-unique-note-creator)).
@@ -23,8 +23,9 @@ An [Obsidian](https://obsidian.md) plugin that opens a custom view showing every
 
 This plugin **depends on Obsidian's own core plugin "Unique note creator"** (internal id `zk-prefixer`; enable it under Settings → Core plugins).
 
-- The **New Note** button doesn't create files itself — it triggers that core plugin's note-creation command.
-- Notes List reads each note's **date and time from its filename**, expecting the strict format `YYYYMMDDHHmm` (e.g. `202609251050.md` → 25 Sep 2026, 10:50). This is the same naming pattern "Unique note creator" can generate, so **that plugin must be configured (its note title/date format setting) to produce filenames in this exact `YYYYMMDDHHmm` pattern** for the list and heatmap to date notes correctly. A note whose filename doesn't match falls back to the file's creation time.
+The **New Note** button doesn't create files itself — it triggers that core plugin's note-creation command.
+
+Note dating is independent of this dependency: Notes List reads each note's `date`/`time` frontmatter properties; if a note doesn't have them, its file's last-modified time is used instead.
 
 ## Installation
 
