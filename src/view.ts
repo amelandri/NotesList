@@ -1,5 +1,6 @@
 import { App, EventRef, ItemView, MarkdownRenderer, Notice, TFile, WorkspaceLeaf, getAllTags, moment, setIcon } from "obsidian";
 import type NotesListPlugin from "./main";
+import type { ContentDisplayMode } from "./settings";
 import { renderHeatmap, type HeatmapSelection } from "./heatmap";
 import { buildTagTree, renderTagTree, tagMatchesFilter } from "./tagTree";
 
@@ -9,6 +10,34 @@ export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
 // "zk-prefixer", formerly "Zettelkasten Prefixer" — verified in app.js). It has
 // no public typings, so it's invoked through app.commands, also undocumented.
 const UNIQUE_NOTE_CREATOR_COMMAND_ID = "zk-prefixer";
+
+// Default filename pattern "Unique note creator" falls back to when it has no
+// configured format of its own (verified in app.js: getFormat() reads
+// this.options.format and falls back to this same literal). Used only to tell
+// an auto-named note apart from a manually (re)named one for the "when
+// different" showNoteName mode — unrelated to date resolution, which comes
+// from frontmatter (see resolveDate()).
+const DEFAULT_UNIQUE_NOTE_NAME_FORMAT = "YYYYMMDDHHmm";
+
+interface InternalPlugins {
+	getEnabledPluginById(id: string): { options?: { format?: unknown } } | null;
+}
+
+function internalPlugins(app: App): InternalPlugins {
+	return (app as unknown as { internalPlugins: InternalPlugins }).internalPlugins;
+}
+
+// Reads the *actual* format "Unique note creator" is configured to generate
+// names with (its own settings tab, not a value we hardcode), so renamed-note
+// detection stays correct even if the user changed that format.
+function getUniqueNoteNameFormat(app: App): string {
+	const format = internalPlugins(app).getEnabledPluginById(UNIQUE_NOTE_CREATOR_COMMAND_ID)?.options?.format;
+	return typeof format === "string" && format ? format : DEFAULT_UNIQUE_NOTE_NAME_FORMAT;
+}
+
+function isUniqueNoteName(basename: string, format: string): boolean {
+	return moment(basename, format, true).isValid();
+}
 
 interface NoteEntry {
 	file: TFile;
@@ -143,7 +172,7 @@ export class NotesListView extends ItemView {
 	}
 
 	async refresh(): Promise<void> {
-		const { contentPreviewChars, notesPerPage } = this.plugin.settings;
+		const { notesPerPage } = this.plugin.settings;
 
 		const allEntries: NoteEntry[] = this.getNotesInScope().map((file) => {
 			const cache = this.app.metadataCache.getFileCache(file);
@@ -226,7 +255,7 @@ export class NotesListView extends ItemView {
 			const pageEntries = visibleEntries.slice(pageStart, pageStart + notesPerPage);
 
 			for (const entry of pageEntries) {
-				await this.renderEntry(mainEl, entry, contentPreviewChars);
+				await this.renderEntry(mainEl, entry);
 			}
 
 			this.renderPagination(mainEl, totalPages);
@@ -331,7 +360,27 @@ export class NotesListView extends ItemView {
 		void this.refresh();
 	}
 
-	private async renderEntry(container: HTMLElement, entry: NoteEntry, contentPreviewChars: number): Promise<void> {
+	private shouldShowNoteName(file: TFile): boolean {
+		switch (this.plugin.settings.showNoteName) {
+			case "always":
+				return true;
+			case "whenDifferent":
+				return !isUniqueNoteName(file.basename, getUniqueNoteNameFormat(this.app));
+			case "never":
+			default:
+				return false;
+		}
+	}
+
+	// The global "Content display" setting, unless a note overrides it with its
+	// own content-display: full/preview frontmatter property.
+	private resolveContentDisplay(fm: Record<string, unknown> | undefined): ContentDisplayMode {
+		const override = fm?.["content-display"];
+		if (override === "full" || override === "preview") return override;
+		return this.plugin.settings.contentDisplay;
+	}
+
+	private async renderEntry(container: HTMLElement, entry: NoteEntry): Promise<void> {
 		const { file, date } = entry;
 		const item = container.createDiv({ cls: "notes-list-item" });
 
@@ -345,14 +394,23 @@ export class NotesListView extends ItemView {
 			this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
 		});
 
+		if (this.shouldShowNoteName(file)) {
+			item.createEl("div", { text: file.basename, cls: "notes-list-title" });
+		}
+
 		const contentEl = item.createDiv({ cls: "notes-list-content" });
 		const raw = await this.app.vault.cachedRead(file);
 		const cache = this.app.metadataCache.getFileCache(file);
 		const bodyStart = cache?.frontmatterPosition?.end?.offset ?? 0;
 		let body = raw.slice(bodyStart).trim();
-		if (contentPreviewChars > 0 && body.length > contentPreviewChars) {
-			body = body.slice(0, contentPreviewChars).trim() + "…";
+
+		if (this.resolveContentDisplay(cache?.frontmatter) === "preview") {
+			const { previewLength } = this.plugin.settings;
+			if (body.length > previewLength) {
+				body = body.slice(0, previewLength).trim() + "…";
+			}
 		}
+
 		await MarkdownRenderer.render(this.app, body, contentEl, file.path, this.plugin);
 	}
 }

@@ -139,6 +139,11 @@
 	border-bottom: none;
 }
 
+.notes-list-title {
+	font-weight: 600;
+	margin-bottom: var(--size-2-1);
+}
+
 .notes-list-datetime {
 	display: inline-block;
 	font-size: var(--font-ui-small);

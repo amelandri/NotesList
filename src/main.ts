@@ -1,5 +1,14 @@
-import { App, Plugin, PluginSettingTab, Setting, TAbstractFile, WorkspaceLeaf, debounce } from "obsidian";
-import { DEFAULT_SETTINGS, NotesListSettings } from "./settings";
+import {
+	App,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	SettingGroup,
+	TAbstractFile,
+	WorkspaceLeaf,
+	debounce,
+} from "obsidian";
+import { ContentDisplayMode, DEFAULT_SETTINGS, NotesListSettings, ShowNoteNameMode } from "./settings";
 import { FolderSuggest } from "./folderSuggest";
 import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
 
@@ -87,43 +96,88 @@ class NotesListSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl)
-			.setName("Folder")
-			.setDesc("Vault folder to watch. Empty = entire vault.")
-			.addText((text) => {
-				new FolderSuggest(this.app, text.inputEl);
-				text
-					.setPlaceholder("e.g. Journal")
-					.setValue(this.plugin.settings.folderPath)
-					.onChange(async (value) => {
-						this.plugin.settings.folderPath = value;
-						await this.plugin.saveSettings();
+		new SettingGroup(containerEl)
+			.setHeading("Folder settings")
+			.addSetting((setting) => {
+				setting
+					.setName("Folder")
+					.setDesc("Vault folder to watch (empty = entire vault)")
+					.addText((text) => {
+						new FolderSuggest(this.app, text.inputEl);
+						text
+							.setPlaceholder("e.g. Journal")
+							.setValue(this.plugin.settings.folderPath)
+							.onChange(async (value) => {
+								this.plugin.settings.folderPath = value;
+								await this.plugin.saveSettings();
+							});
 					});
+			})
+			.addSetting((setting) => {
+				setting
+					.setName("Subfolders")
+					.setDesc("includes its subfolders.")
+					.addToggle((toggle) =>
+						toggle
+							.setTooltip("Include subfolders")
+							.setValue(this.plugin.settings.includeSubfolders)
+							.onChange(async (value) => {
+								this.plugin.settings.includeSubfolders = value;
+								await this.plugin.saveSettings();
+							})
+					);
 			});
 
-		new Setting(containerEl)
-			.setName("Include subfolders")
-			.setDesc("When enabled, also shows notes in subfolders of the chosen folder.")
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.includeSubfolders).onChange(async (value) => {
-					this.plugin.settings.includeSubfolders = value;
-					await this.plugin.saveSettings();
-				})
-			);
-
-		new Setting(containerEl)
-			.setName("Content preview length")
-			.setDesc("Maximum number of content characters shown per note. 0 = full content.")
-			.addText((text) =>
-				text
-					.setPlaceholder("300")
-					.setValue(String(this.plugin.settings.contentPreviewChars))
-					.onChange(async (value) => {
-						const parsed = Number.parseInt(value, 10);
-						this.plugin.settings.contentPreviewChars = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-						await this.plugin.saveSettings();
-					})
-			);
+		new SettingGroup(containerEl)
+			.setHeading("Notes Display")
+			.addSetting((setting) => {
+				setting
+					.setName("Show note name")
+					.setDesc("Whether to show each note's file name.")
+					.addDropdown((dropdown) =>
+						dropdown
+							.addOption("never", "Never")
+							.addOption("always", "Always")
+							.addOption("whenDifferent", "When different from unique note name")
+							.setValue(this.plugin.settings.showNoteName)
+							.onChange(async (value) => {
+								this.plugin.settings.showNoteName = value as ShowNoteNameMode;
+								await this.plugin.saveSettings();
+							})
+					);
+			})
+			.addSetting((setting) => {
+				setting
+					.setName("Content display")
+					.setDesc(
+						'Show a note\'s full content or a truncated preview. A note can override this with "content-display" frontmatter property.'
+					)
+					.addDropdown((dropdown) =>
+						dropdown
+							.addOption("full", "Full")
+							.addOption("preview", "Preview")
+							.setValue(this.plugin.settings.contentDisplay)
+							.onChange(async (value) => {
+								this.plugin.settings.contentDisplay = value as ContentDisplayMode;
+								await this.plugin.saveSettings();
+							})
+					);
+			})
+			.addSetting((setting) => {
+				setting
+					.setName("Preview length")
+					.setDesc("Maximum number of characters shown when Content display is set to Preview.")
+					.addText((text) => {
+						text
+							.setPlaceholder("300")
+							.setValue(String(this.plugin.settings.previewLength))
+							.onChange(async (value) => {
+								const parsed = Number.parseInt(value, 10);
+								this.plugin.settings.previewLength = Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+								await this.plugin.saveSettings();
+							});
+					});
+			});
 
 		new Setting(containerEl)
 			.setName("Notes per page")
