@@ -1,4 +1,16 @@
-import { App, EventRef, ItemView, MarkdownRenderer, Notice, TFile, WorkspaceLeaf, getAllTags, moment, setIcon } from "obsidian";
+import {
+	App,
+	CachedMetadata,
+	EventRef,
+	ItemView,
+	MarkdownRenderer,
+	Notice,
+	TFile,
+	WorkspaceLeaf,
+	getAllTags,
+	moment,
+	setIcon,
+} from "obsidian";
 import type NotesListPlugin from "./main";
 import type { ContentDisplayMode } from "./settings";
 import { renderHeatmap, type HeatmapSelection } from "./heatmap";
@@ -71,6 +83,13 @@ export class NotesListView extends ItemView {
 	private selectedMonth: string | null = null;
 	private collapsedTagPaths = new Set<string>();
 	private currentPage = 1;
+	// Populated by rebuildEntries() — the expensive per-note scan (metadata
+	// lookup, date resolution, tag extraction). Reused across render()s that
+	// only change UI state (pagination, filter selection, tag-tree collapse),
+	// so those stay cheap even in a folder with thousands of notes; only
+	// refresh() (vault/metadata changes, settings changes, initial open)
+	// rebuilds it.
+	private cachedEntries: NoteEntry[] = [];
 
 	constructor(leaf: WorkspaceLeaf, plugin: NotesListPlugin) {
 		super(leaf);
@@ -92,7 +111,9 @@ export class NotesListView extends ItemView {
 	async onOpen(): Promise<void> {
 		this.registerEvent(
 			internalVault(this.app).on("config-changed", (key) => {
-				if (key === "readableLineLength") void this.refresh();
+				// Only affects the is-readable-line-width CSS class — no need to
+				// rescan every note in scope for a purely visual toggle.
+				if (key === "readableLineLength") void this.render();
 			})
 		);
 		await this.refresh();
@@ -133,8 +154,8 @@ export class NotesListView extends ItemView {
 		});
 	}
 
-	private resolveDate(file: TFile): moment.Moment {
-		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+	private resolveDate(file: TFile, cache: CachedMetadata | null): moment.Moment {
+		const fm = cache?.frontmatter;
 
 		// fm.date may be a plain string, or a native Date object — YAML auto-casts an
 		// unquoted YYYY-MM-DD scalar to one. moment(...) accepts either; startOf("day")
@@ -171,15 +192,27 @@ export class NotesListView extends ItemView {
 		return null;
 	}
 
+	// Full data reload: re-scans every note in scope (metadata, date, tags) —
+	// the only expensive step, so it's kept out of render() (see cachedEntries).
+	// Call this when the note set or its metadata might have changed (vault
+	// events, settings changes, initial open); call render() directly for
+	// anything that only changes UI state.
 	async refresh(): Promise<void> {
-		const { notesPerPage } = this.plugin.settings;
+		this.rebuildEntries();
+		await this.render();
+	}
 
-		const allEntries: NoteEntry[] = this.getNotesInScope().map((file) => {
+	private rebuildEntries(): void {
+		this.cachedEntries = this.getNotesInScope().map((file) => {
 			const cache = this.app.metadataCache.getFileCache(file);
-			return { file, date: this.resolveDate(file), tags: cache ? getAllTags(cache) ?? [] : [] };
+			return { file, date: this.resolveDate(file, cache), tags: cache ? getAllTags(cache) ?? [] : [] };
 		});
+		this.cachedEntries.sort((a, b) => b.date.valueOf() - a.date.valueOf());
+	}
 
-		allEntries.sort((a, b) => b.date.valueOf() - a.date.valueOf());
+	private async render(): Promise<void> {
+		const { notesPerPage } = this.plugin.settings;
+		const allEntries = this.cachedEntries;
 
 		const visibleEntries = allEntries.filter((entry) => {
 			const matchesTag = !this.selectedTag || entry.tags.some((tag) => tagMatchesFilter(tag, this.selectedTag!));
@@ -206,7 +239,7 @@ export class NotesListView extends ItemView {
 			this.renderFilterPill(titleGroup, `#${this.selectedTag}`, "Clear tag filter", () => {
 				this.selectedTag = null;
 				this.currentPage = 1;
-				void this.refresh();
+				void this.render();
 			});
 		}
 
@@ -214,7 +247,7 @@ export class NotesListView extends ItemView {
 			this.renderFilterPill(titleGroup, moment(this.selectedDate).format("D MMM YYYY"), "Clear date filter", () => {
 				this.selectedDate = null;
 				this.currentPage = 1;
-				void this.refresh();
+				void this.render();
 			});
 		}
 
@@ -226,7 +259,7 @@ export class NotesListView extends ItemView {
 				() => {
 					this.selectedMonth = null;
 					this.currentPage = 1;
-					void this.refresh();
+					void this.render();
 				}
 			);
 		}
@@ -267,18 +300,19 @@ export class NotesListView extends ItemView {
 			onSelectDate: (date) => {
 				this.selectedDate = date;
 				this.currentPage = 1;
-				void this.refresh();
+				void this.render();
 			},
 			selectedMonth: this.selectedMonth,
 			onSelectMonth: (month) => {
 				this.selectedMonth = month;
 				this.currentPage = 1;
-				void this.refresh();
+				void this.render();
 			},
 		};
 		renderHeatmap(
 			heatmapPanel.createDiv(),
 			allEntries.map((e) => e.date),
+			visibleEntries.length,
 			heatmapSelection
 		);
 
@@ -293,13 +327,13 @@ export class NotesListView extends ItemView {
 			(path) => {
 				this.selectedTag = path;
 				this.currentPage = 1;
-				void this.refresh();
+				void this.render();
 			},
 			(path) => {
 				if (!this.collapsedTagPaths.delete(path)) {
 					this.collapsedTagPaths.add(path);
 				}
-				void this.refresh();
+				void this.render();
 			}
 		);
 	}
@@ -357,7 +391,7 @@ export class NotesListView extends ItemView {
 
 	private goToPage(page: number): void {
 		this.currentPage = page;
-		void this.refresh();
+		void this.render();
 	}
 
 	private shouldShowNoteName(file: TFile): boolean {

@@ -10,7 +10,12 @@ export interface HeatmapSelection {
 	onSelectMonth: (month: string) => void;
 }
 
-export function renderHeatmap(container: HTMLElement, dates: moment.Moment[], selection: HeatmapSelection): void {
+export function renderHeatmap(
+	container: HTMLElement,
+	dates: moment.Moment[],
+	visibleCount: number,
+	selection: HeatmapSelection
+): void {
 	const { selectedDate, onSelectDate, selectedMonth, onSelectMonth } = selection;
 
 	const dayCounts = new Map<string, number>();
@@ -73,6 +78,13 @@ export function renderHeatmap(container: HTMLElement, dates: moment.Moment[], se
 		legend.createDiv({ cls: `notes-heatmap-cell level-${level}` });
 	}
 	legend.createSpan({ text: "More" });
+
+	const total = dates.length;
+	const totalLabel = `${total} note${total === 1 ? "" : "s"}`;
+	legend.createSpan({
+		text: visibleCount === total ? totalLabel : `${visibleCount} of ${totalLabel}`,
+		cls: "notes-heatmap-total",
+	});
 }
 
 function levelFor(count: number, maxCount: number): number {

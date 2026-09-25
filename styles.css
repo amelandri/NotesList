@@ -315,6 +315,10 @@
 	height: 10px;
 }
 
+.notes-heatmap-total {
+	margin-left: auto;
+}
+
 .notes-tag-tree-panel {
 	margin-top: 3rem;
 }
