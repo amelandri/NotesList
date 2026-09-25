@@ -1,6 +1,7 @@
 import { App, EventRef, ItemView, MarkdownRenderer, Notice, TFile, WorkspaceLeaf, getAllTags, moment, setIcon } from "obsidian";
 import type NotesListPlugin from "./main";
 import { renderHeatmap } from "./heatmap";
+import { buildTagTree, renderTagTree, tagMatchesFilter } from "./tagTree";
 
 export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
 
@@ -36,6 +37,9 @@ function internalCommands(app: App): CommandsInternal {
 
 export class NotesListView extends ItemView {
 	private plugin: NotesListPlugin;
+	private selectedTag: string | null = null;
+	private collapsedTagPaths = new Set<string>();
+	private currentPage = 1;
 
 	constructor(leaf: WorkspaceLeaf, plugin: NotesListPlugin) {
 		super(leaf);
@@ -95,15 +99,18 @@ export class NotesListView extends ItemView {
 	}
 
 	async refresh(): Promise<void> {
-		const { showTags, contentPreviewChars } = this.plugin.settings;
+		const { contentPreviewChars, notesPerPage } = this.plugin.settings;
 
-		const entries: NoteEntry[] = this.getNotesInScope().map((file) => {
+		const allEntries: NoteEntry[] = this.getNotesInScope().map((file) => {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const tags = cache ? getAllTags(cache) ?? [] : [];
-			return { file, date: this.resolveDate(file), tags };
+			return { file, date: this.resolveDate(file), tags: cache ? getAllTags(cache) ?? [] : [] };
 		});
 
-		entries.sort((a, b) => b.date.valueOf() - a.date.valueOf());
+		allEntries.sort((a, b) => b.date.valueOf() - a.date.valueOf());
+
+		const visibleEntries = this.selectedTag
+			? allEntries.filter((entry) => entry.tags.some((tag) => tagMatchesFilter(tag, this.selectedTag!)))
+			: allEntries;
 
 		const container = this.contentEl;
 		container.empty();
@@ -116,7 +123,24 @@ export class NotesListView extends ItemView {
 		mainEl.toggleClass("is-readable-line-width", this.isReadableLineWidthEnabled());
 
 		const header = mainEl.createDiv({ cls: "notes-list-header" });
-		header.createEl("h4", { text: "Notes", cls: "notes-list-panel-title" });
+		const titleGroup = header.createDiv({ cls: "notes-list-header-title-group" });
+		titleGroup.createEl("h4", { text: "Notes", cls: "notes-list-panel-title" });
+
+		if (this.selectedTag) {
+			const pill = titleGroup.createDiv({ cls: "notes-list-tag-pill" });
+			pill.createSpan({ text: `#${this.selectedTag}` });
+			const clearButton = pill.createEl("button", {
+				cls: "notes-list-tag-pill-clear",
+				attr: { "aria-label": "Clear tag filter", type: "button" },
+			});
+			setIcon(clearButton, "x");
+			clearButton.addEventListener("click", () => {
+				this.selectedTag = null;
+				this.currentPage = 1;
+				void this.refresh();
+			});
+		}
+
 		const newNoteButton = header.createEl("button", {
 			cls: "notes-list-new-note-button",
 			attr: { "aria-label": "New note", type: "button" },
@@ -124,31 +148,104 @@ export class NotesListView extends ItemView {
 		setIcon(newNoteButton, "plus");
 		newNoteButton.addEventListener("click", () => this.createUniqueNote());
 
-		if (entries.length === 0) {
+		if (visibleEntries.length === 0) {
 			mainEl.createEl("p", {
-				text: "No notes found in the configured folder.",
+				text: this.selectedTag
+					? `No notes tagged #${this.selectedTag}.`
+					: "No notes found in the configured folder.",
 				cls: "notes-list-empty",
 			});
 		} else {
-			for (const entry of entries) {
-				await this.renderEntry(mainEl, entry, showTags, contentPreviewChars);
+			const totalPages = Math.max(1, Math.ceil(visibleEntries.length / notesPerPage));
+			this.currentPage = Math.min(Math.max(1, this.currentPage), totalPages);
+
+			// Only the current page's notes get their content read from disk and
+			// rendered as Markdown — the expensive part. allEntries/visibleEntries
+			// above only ever hold TFile references plus already-cached metadata
+			// (date, tags), so scanning a large folder to paginate it stays cheap.
+			const pageStart = (this.currentPage - 1) * notesPerPage;
+			const pageEntries = visibleEntries.slice(pageStart, pageStart + notesPerPage);
+
+			for (const entry of pageEntries) {
+				await this.renderEntry(mainEl, entry, contentPreviewChars);
 			}
+
+			this.renderPagination(mainEl, totalPages);
 		}
 
 		heatmapPanel.createEl("h4", { text: "Activity", cls: "notes-list-panel-title" });
 		renderHeatmap(
 			heatmapPanel.createDiv(),
-			entries.map((e) => e.date)
+			allEntries.map((e) => e.date)
+		);
+
+		const tagPanel = heatmapPanel.createDiv({ cls: "notes-tag-tree-panel" });
+		tagPanel.createEl("h4", { text: "Tags", cls: "notes-list-panel-title" });
+		const tagTree = buildTagTree(allEntries.flatMap((e) => e.tags));
+		renderTagTree(
+			tagPanel.createDiv({ cls: "notes-tag-tree" }),
+			tagTree,
+			this.selectedTag,
+			this.collapsedTagPaths,
+			(path) => {
+				this.selectedTag = path;
+				this.currentPage = 1;
+				void this.refresh();
+			},
+			(path) => {
+				if (!this.collapsedTagPaths.delete(path)) {
+					this.collapsedTagPaths.add(path);
+				}
+				void this.refresh();
+			}
 		);
 	}
 
-	private async renderEntry(
-		container: HTMLElement,
-		entry: NoteEntry,
-		showTags: boolean,
-		contentPreviewChars: number
-	): Promise<void> {
-		const { file, date, tags } = entry;
+	private renderPagination(container: HTMLElement, totalPages: number): void {
+		if (totalPages <= 1) return;
+
+		const nav = container.createDiv({ cls: "notes-list-pagination" });
+
+		if (this.currentPage > 1) {
+			const prev = nav.createEl("button", {
+				cls: "notes-list-page-button",
+				attr: { type: "button", "aria-label": "Previous page" },
+			});
+			setIcon(prev, "chevron-left");
+			prev.addEventListener("click", () => this.goToPage(this.currentPage - 1));
+		}
+
+		const maxVisiblePages = 5;
+		let start = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+		const end = Math.min(totalPages, start + maxVisiblePages - 1);
+		start = Math.max(1, end - maxVisiblePages + 1);
+
+		for (let page = start; page <= end; page++) {
+			const button = nav.createEl("button", {
+				text: String(page),
+				cls: "notes-list-page-button" + (page === this.currentPage ? " is-active" : ""),
+				attr: { type: "button" },
+			});
+			button.addEventListener("click", () => this.goToPage(page));
+		}
+
+		if (this.currentPage < totalPages) {
+			const next = nav.createEl("button", {
+				cls: "notes-list-page-button",
+				attr: { type: "button", "aria-label": "Next page" },
+			});
+			setIcon(next, "chevron-right");
+			next.addEventListener("click", () => this.goToPage(this.currentPage + 1));
+		}
+	}
+
+	private goToPage(page: number): void {
+		this.currentPage = page;
+		void this.refresh();
+	}
+
+	private async renderEntry(container: HTMLElement, entry: NoteEntry, contentPreviewChars: number): Promise<void> {
+		const { file, date } = entry;
 		const item = container.createDiv({ cls: "notes-list-item" });
 
 		const link = item.createEl("a", {
@@ -170,12 +267,5 @@ export class NotesListView extends ItemView {
 			body = body.slice(0, contentPreviewChars).trim() + "…";
 		}
 		await MarkdownRenderer.render(this.app, body, contentEl, file.path, this.plugin);
-
-		if (showTags && tags.length > 0) {
-			const tagsEl = item.createDiv({ cls: "notes-list-tags" });
-			for (const tag of tags) {
-				tagsEl.createEl("span", { text: tag, cls: "notes-list-tag" });
-			}
-		}
 	}
 }

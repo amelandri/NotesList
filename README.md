@@ -11,12 +11,13 @@ An [Obsidian](https://obsidian.md) plugin that opens a custom view showing every
 - **Configurable folder** — pick any vault folder to watch (with autocomplete), optionally including its subfolders.
 - **Chronological note list** — every note in scope, sorted newest first, each entry showing:
   - **date and time**, derived from the note's filename (see [Dependency](#dependency-unique-note-creator) below), rendered as a clickable link to the note;
-  - the note's **rendered content** (full or truncated to a configurable character length);
-  - the note's **tags** (can be toggled off).
+  - the note's **rendered content** (full or truncated to a configurable character length).
+- **Pagination** — the list is split into pages (size configurable, default 10). Page navigation appears at the bottom of the list only when there's more than one page: previous/next buttons plus up to 5 page numbers, kept centered around the current page as you move through a long list. Only the notes on the current page have their content actually read and rendered, so browsing a large folder stays fast regardless of how many notes are in scope.
 - **New Note button** — a small circular `+` button next to the list title creates a new, uniquely-named note in one click (see [Dependency](#dependency-unique-note-creator)).
 - **Activity heatmap** — a GitHub-contributions-style grid of the last 6 months, one cell per day, shaded by how many notes were created that day, with a hover tooltip and month labels. It stays pinned in view while the notes list scrolls.
+- **Hierarchical tag browser** — below the heatmap, a nested, collapsible list of every tag found across the notes in scope (nested tags like `#area/work` render as a tree; branches with children can be collapsed/expanded with the chevron). Clicking a tag's name filters the notes list to notes carrying that tag or any of its nested sub-tags. The active filter shows as a pill next to the "Notes" title, with an `x` to clear it and restore the full list.
 - **Respects your Editor settings** — the notes column honors Obsidian's own "Readable line length" toggle (Settings → Editor), live.
-- Auto-refreshes when notes in the watched folder are created, edited, deleted, renamed, or have their metadata (tags, frontmatter) changed.
+- Auto-refreshes when notes in the watched folder are created, edited, deleted, renamed, or have their frontmatter changed.
 
 ## Dependency: Unique note creator
 
@@ -44,8 +45,8 @@ For local development, `npm run deploy` builds and copies those three files stra
 | --- | --- |
 | Folder | Vault folder to watch. Empty = entire vault. |
 | Include subfolders | Also show notes from subfolders of the chosen folder. |
-| Show tags | Toggle each note's tags in the list. |
 | Content preview length | Max characters of content shown per note (0 = full content). |
+| Notes per page | Number of notes shown per page in the list (default 10). |
 
 ## Development
 

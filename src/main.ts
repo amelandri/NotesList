@@ -112,16 +112,6 @@ class NotesListSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Show tags")
-			.setDesc("Shows each note's tags.")
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.showTags).onChange(async (value) => {
-					this.plugin.settings.showTags = value;
-					await this.plugin.saveSettings();
-				})
-			);
-
-		new Setting(containerEl)
 			.setName("Content preview length")
 			.setDesc("Maximum number of content characters shown per note. 0 = full content.")
 			.addText((text) =>
@@ -131,6 +121,20 @@ class NotesListSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						const parsed = Number.parseInt(value, 10);
 						this.plugin.settings.contentPreviewChars = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Notes per page")
+			.setDesc("Number of notes shown per page in the list.")
+			.addText((text) =>
+				text
+					.setPlaceholder("10")
+					.setValue(String(this.plugin.settings.notesPerPage))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						this.plugin.settings.notesPerPage = Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
 						await this.plugin.saveSettings();
 					})
 			);

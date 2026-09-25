@@ -10,7 +10,7 @@
 .notes-list-layout {
 	display: flex;
 	align-items: flex-start;
-	gap: var(--size-4-6);
+	gap: 3rem;
 	padding: var(--size-4-4) !important;
 }
 
@@ -56,6 +56,46 @@
 
 .notes-list-header .notes-list-panel-title {
 	margin: 0;
+}
+
+.notes-list-header-title-group {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-width: 0;
+}
+
+.notes-list-tag-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-accent);
+	background-color: var(--background-modifier-hover);
+	border-radius: var(--radius-s);
+	padding: var(--size-2-1) var(--size-2-1) var(--size-2-1) var(--size-2-2);
+	white-space: nowrap;
+}
+
+.notes-list-tag-pill-clear {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+	padding: 0;
+	background-color: transparent;
+	color: inherit;
+	border-radius: 50%;
+}
+
+.notes-list-tag-pill-clear:hover {
+	background-color: var(--background-modifier-active-hover);
+}
+
+.notes-list-tag-pill-clear svg {
+	width: 10px;
+	height: 10px;
 }
 
 .notes-list-new-note-button {
@@ -118,24 +158,44 @@
 	margin-bottom: 0;
 }
 
-.notes-list-tags {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--size-2-2);
-	margin-top: var(--size-2-2);
-}
-
-.notes-list-tag {
-	font-size: var(--font-ui-smaller);
-	color: var(--tag-color, var(--text-accent));
-	background: var(--tag-background, var(--background-modifier-hover));
-	border-radius: var(--radius-s);
-	padding: 0 var(--size-2-2);
-}
-
 .notes-list-empty {
 	color: var(--text-muted);
 	font-style: italic;
+}
+
+.notes-list-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--size-2-2);
+	margin-top: var(--size-4-4);
+}
+
+.notes-list-page-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 28px;
+	height: 28px;
+	padding: 0 var(--size-2-2);
+	border-radius: var(--radius-s);
+	background-color: transparent;
+	color: var(--text-muted);
+}
+
+.notes-list-page-button:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.notes-list-page-button.is-active {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.notes-list-page-button svg {
+	width: 14px;
+	height: 14px;
 }
 
 .notes-heatmap-scroller {
@@ -212,4 +272,82 @@
 .notes-heatmap-legend .notes-heatmap-cell {
 	width: 10px;
 	height: 10px;
+}
+
+.notes-tag-tree-panel {
+	margin-top: 3rem;
+}
+
+.notes-tag-tree-empty {
+	color: var(--text-muted);
+	font-style: italic;
+	font-size: var(--font-ui-small);
+	margin: 0;
+}
+
+.notes-tag-tree-list {
+	list-style: none;
+	margin: 0;
+	padding-left: var(--size-4-3);
+}
+
+.notes-tag-tree > .notes-tag-tree-list {
+	padding-left: 0;
+}
+
+.notes-tag-tree-item {
+	margin: var(--size-2-1) 0;
+}
+
+.notes-tag-tree-item.is-collapsed > .notes-tag-tree-list {
+	display: none;
+}
+
+.notes-tag-tree-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-1);
+}
+
+.notes-tag-tree-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 14px;
+	height: 14px;
+	color: var(--text-faint);
+}
+
+.notes-tag-tree-toggle:empty {
+	cursor: default;
+}
+
+.notes-tag-tree-toggle svg {
+	width: 10px;
+	height: 10px;
+	transition: transform 100ms ease-in-out;
+}
+
+.notes-tag-tree-item.is-collapsed > .notes-tag-tree-row > .notes-tag-tree-toggle svg {
+	transform: rotate(-90deg);
+}
+
+.notes-tag-tree-toggle:not(:empty) {
+	cursor: pointer;
+}
+
+.notes-tag-tree-label {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.notes-tag-tree-label:hover {
+	color: var(--text-accent-hover);
+}
+
+.notes-tag-tree-label.is-selected {
+	color: var(--text-accent);
+	font-weight: 600;
 }

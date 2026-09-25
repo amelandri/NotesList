@@ -18,9 +18,10 @@ There are no automated tests and no linter configured.
 ## Architecture
 
 - `src/main.ts` — `Plugin` entry point. Registers the `ItemView`, a ribbon icon + command to open it, and the `PluginSettingTab`. Also wires vault (`modify`/`create`/`delete`/`rename`) and `metadataCache` (`changed`) events to a debounced `requestRefresh()` that re-renders any open `NotesListView` leaf. Settings persist via `loadData`/`saveData` (`data.json` in the plugin folder), merged over `DEFAULT_SETTINGS`.
-- `src/settings.ts` — the `NotesListSettings` shape and defaults: `folderPath`, `includeSubfolders`, `showTags`, `contentPreviewChars`.
+- `src/settings.ts` — the `NotesListSettings` shape and defaults: `folderPath`, `includeSubfolders`, `contentPreviewChars`, `notesPerPage`.
 - `src/view.ts` — the `ItemView` (`VIEW_TYPE_NOTES_LIST`). `refresh()` is the single render entry point: it resolves the note set in scope, sorts descending by date, and rebuilds the DOM from scratch (`contentEl.empty()` then re-render) rather than diffing.
 - `src/heatmap.ts` — pure DOM-rendering function (`renderHeatmap(container, dates)`), no plugin/view state. Buckets note counts per day into a 6-month, GitHub-style week/weekday grid.
+- `src/tagTree.ts` — pure functions for the tag browser: `buildTagTree(tags)` groups `#a/b/c`-style tags (as returned by `getAllTags`) into a nested `TagTreeNode` map by splitting on `/`; `renderTagTree(container, root, selectedPath, collapsedPaths, onSelect, onToggleCollapse)` renders it as nested, collapsible `<ul>`s (a chevron toggle appears only on nodes with children); `tagMatchesFilter(tag, filter)` implements Obsidian's usual hierarchical tag semantics (selecting a tag also matches its sub-tags).
 - `src/folderSuggest.ts` — `AbstractInputSuggest<TFolder>` used by the folder-path setting field.
 - `styles.css` — all view styling, loaded automatically by Obsidian alongside `main.js`/`manifest.json`.
 
@@ -37,6 +38,16 @@ The list header's "New Note" button does not create files itself — it invokes 
 
 If Obsidian changes either internal API in a future release, these two wrapper functions in `view.ts` are the only places that need to change.
 
+### Tag filtering
+
+`NotesListView.selectedTag` and `NotesListView.collapsedTagPaths` are transient view state (not persisted to `data.json` — both reset when the view is closed/reopened). `selectedTag` is set when a tag's label is clicked in the tag tree under the heatmap panel and cleared via the `x` on the filter pill next to the "Notes" title. `refresh()` always builds the tag tree and the heatmap from the *full* unfiltered note set in scope, but only the main notes list is filtered down to notes matching `selectedTag` (via `tagMatchesFilter`) — so the tag index and activity heatmap stay stable reference points regardless of the current filter. Clicking a node's chevron toggles its path in/out of `collapsedTagPaths` and calls `refresh()` again like any other interaction (the view always rebuilds its whole DOM rather than patching just the tree — see `src/view.ts`'s `refresh()`).
+
+### Pagination
+
+`refresh()` computes `allEntries`/`visibleEntries` (after tag filtering) cheaply for every note in scope — those only ever hold a `TFile` reference plus already-cached metadata (resolved date, tags via `getAllTags`), never file content. `NotesListView.currentPage` (transient, like `selectedTag`) is clamped into `[1, totalPages]` on every `refresh()` based on `visibleEntries.length` and `settings.notesPerPage`, then `visibleEntries` is sliced to just that page's window (`pageEntries`) **before** calling `renderEntry()` — the only step that actually reads file content (`vault.cachedRead`) and runs `MarkdownRenderer.render`. This is what keeps a large watched folder fast to page through: the expensive per-note work scales with `notesPerPage`, not with the total note count. `renderPagination()` renders prev/next buttons only when a previous/next page exists, and windows the page-number buttons to at most 5, sliding to keep `currentPage` inside the window (clamped at both ends so it never shows fewer than 5 when `totalPages >= 5`). Selecting or clearing a tag filter always resets `currentPage` to 1; other refresh triggers (vault events, settings changes) just re-clamp it, so unrelated background updates don't kick you back to page 1 mid-browsing.
+
 ### Layout
 
-The view content is a flex row (`.notes-list-layout`): `.notes-list-main` (flex-grow, `overflow-y: auto`, scrolls independently) and `.notes-list-heatmap-panel` (`flex: 0 0 auto`, sized to its own content, never shrinks). Because only the notes column scrolls, the heatmap panel stays fully visible without needing `position: sticky`.
+`.notes-list-view` (the `ItemView`'s `contentEl`) is the single scroll container (`overflow-y: auto`, no padding of its own), so the browser's scrollbar sits at the pane's real right edge, same as any other Obsidian view. The visual inset (`padding: var(--size-4-4)`) lives one level in, on `.notes-list-layout` (the flex row: `.notes-list-main`, flex-grow, and `.notes-list-heatmap-panel`, `flex: 0 0 auto`, sized to its own content and never shrinking).
+
+The heatmap panel is `position: sticky` with `top: var(--size-4-4)` — matching `.notes-list-layout`'s padding-top exactly, since the panel already sits that far from the scroll container's top before any scrolling happens; if `top` didn't match, the panel would visibly slide up by the difference before locking in place on the first scroll. This keeps the heatmap pinned and fully visible while the notes list scrolls past beside it.

@@ -3,15 +3,15 @@ export interface NotesListSettings {
 	folderPath: string;
 	/** Also include subfolders of folderPath. */
 	includeSubfolders: boolean;
-	/** Show each note's tags. */
-	showTags: boolean;
 	/** Maximum number of content characters to show per note. 0 = full content. */
 	contentPreviewChars: number;
+	/** Number of notes shown per page in the list. */
+	notesPerPage: number;
 }
 
 export const DEFAULT_SETTINGS: NotesListSettings = {
 	folderPath: "",
 	includeSubfolders: false,
-	showTags: true,
 	contentPreviewChars: 300,
+	notesPerPage: 10,
 };
