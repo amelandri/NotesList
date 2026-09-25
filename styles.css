@@ -124,6 +124,11 @@
 .notes-list-item {
 	padding: 1.3rem 0;
 	border-bottom: 1px solid var(--background-modifier-border);
+	/* Obsidian sets `body { user-select: none }` globally and only re-enables
+	   selection on its own reading/editing views — custom ItemViews like this
+	   one aren't covered by that allowlist, so it has to be opted back in here. */
+	user-select: text;
+	-webkit-user-select: text;
 }
 
 .notes-list-item:first-child {

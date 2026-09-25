@@ -1,6 +1,6 @@
 {
 	"name": "notes-list",
-	"version": "1.0.0",
+	"version": "0.1.0",
 	"description": "Obsidian plugin: chronological list of notes in a folder, with date/time, content and tags",
 	"main": "main.js",
 	"scripts": {

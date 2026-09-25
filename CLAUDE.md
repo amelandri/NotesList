@@ -51,3 +51,7 @@ If Obsidian changes either internal API in a future release, these two wrapper f
 `.notes-list-view` (the `ItemView`'s `contentEl`) is the single scroll container (`overflow-y: auto`, no padding of its own), so the browser's scrollbar sits at the pane's real right edge, same as any other Obsidian view. The visual inset (`padding: var(--size-4-4)`) lives one level in, on `.notes-list-layout` (the flex row: `.notes-list-main`, flex-grow, and `.notes-list-heatmap-panel`, `flex: 0 0 auto`, sized to its own content and never shrinking).
 
 The heatmap panel is `position: sticky` with `top: var(--size-4-4)` — matching `.notes-list-layout`'s padding-top exactly, since the panel already sits that far from the scroll container's top before any scrolling happens; if `top` didn't match, the panel would visibly slide up by the difference before locking in place on the first scroll. This keeps the heatmap pinned and fully visible while the notes list scrolls past beside it.
+
+### Text selection
+
+Obsidian sets `body { user-select: none }` globally (confirmed in the app's own `app.css`) and only re-enables it on its own reading/editing views and `[contenteditable]` elements — a custom `ItemView` like this one isn't covered by that allowlist by default. `.notes-list-item` opts back into `user-select: text` explicitly for that reason. Any new custom sub-view added here that should have selectable text needs the same opt-in.

@@ -1,7 +1,7 @@
 {
 	"id": "notes-list",
 	"name": "Notes List",
-	"version": "1.0.0",
+	"version": "0.1.0",
 	"minAppVersion": "1.5.0",
 	"description": "Shows the notes in a configurable folder in reverse chronological order, with date/time (linked to the note), content and tags.",
 	"author": "Alessandro Melandri",
