@@ -55,6 +55,7 @@ interface NoteEntry {
 	file: TFile;
 	date: moment.Moment;
 	tags: string[];
+	pinned: boolean;
 }
 
 // "readableLineLength" is an undocumented internal Vault config key with no public
@@ -205,7 +206,12 @@ export class NotesListView extends ItemView {
 	private rebuildEntries(): void {
 		this.cachedEntries = this.getNotesInScope().map((file) => {
 			const cache = this.app.metadataCache.getFileCache(file);
-			return { file, date: this.resolveDate(file, cache), tags: cache ? getAllTags(cache) ?? [] : [] };
+			return {
+				file,
+				date: this.resolveDate(file, cache),
+				tags: cache ? getAllTags(cache) ?? [] : [],
+				pinned: cache?.frontmatter?.pinned === true,
+			};
 		});
 		this.cachedEntries.sort((a, b) => b.date.valueOf() - a.date.valueOf());
 	}
@@ -214,12 +220,21 @@ export class NotesListView extends ItemView {
 		const { notesPerPage } = this.plugin.settings;
 		const allEntries = this.cachedEntries;
 
-		const visibleEntries = allEntries.filter((entry) => {
+		const filteredEntries = allEntries.filter((entry) => {
 			const matchesTag = !this.selectedTag || entry.tags.some((tag) => tagMatchesFilter(tag, this.selectedTag!));
 			const matchesDate = !this.selectedDate || entry.date.format("YYYY-MM-DD") === this.selectedDate;
 			const matchesMonth = !this.selectedMonth || entry.date.format("YYYY-MM") === this.selectedMonth;
 			return matchesTag && matchesDate && matchesMonth;
 		});
+
+		// Pinned notes float to the top, each group still newest-first: allEntries
+		// is already sorted by date desc, and Array#filter is stable, so simply
+		// partitioning it (rather than re-sorting) preserves that order within
+		// both groups.
+		const visibleEntries = [
+			...filteredEntries.filter((entry) => entry.pinned),
+			...filteredEntries.filter((entry) => !entry.pinned),
+		];
 
 		const container = this.contentEl;
 		container.empty();
@@ -416,9 +431,11 @@ export class NotesListView extends ItemView {
 
 	private async renderEntry(container: HTMLElement, entry: NoteEntry): Promise<void> {
 		const { file, date } = entry;
-		const item = container.createDiv({ cls: "notes-list-item" });
+		const item = container.createDiv({ cls: "notes-list-item" + (entry.pinned ? " is-pinned" : "") });
 
-		const link = item.createEl("a", {
+		const itemHeader = item.createDiv({ cls: "notes-list-item-header" });
+
+		const link = itemHeader.createEl("a", {
 			text: date.format("YYYY-MM-DD HH:mm"),
 			cls: "notes-list-datetime internal-link",
 			href: file.path,
@@ -426,6 +443,21 @@ export class NotesListView extends ItemView {
 		link.addEventListener("click", (evt) => {
 			evt.preventDefault();
 			this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
+		});
+
+		const pinButton = itemHeader.createEl("button", {
+			cls: "notes-list-pin-button" + (entry.pinned ? " is-pinned" : ""),
+			attr: { "aria-label": entry.pinned ? "Unpin note" : "Pin note", type: "button" },
+		});
+		setIcon(pinButton, "pin");
+		pinButton.addEventListener("click", async () => {
+			const next = !entry.pinned;
+			await this.plugin.setPinned(file, next);
+			// Update the cached entry in place rather than re-scanning: Obsidian's
+			// metadataCache re-parses the frontmatter write asynchronously, so
+			// re-reading it immediately after could still see the old value.
+			entry.pinned = next;
+			void this.render();
 		});
 
 		if (this.shouldShowNoteName(file)) {

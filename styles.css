@@ -131,6 +131,17 @@
 	-webkit-user-select: text;
 }
 
+/* Hook for customization (e.g. via a CSS snippet) — deliberately just a subtle
+   default (an inset box-shadow, so it doesn't shift layout/padding like a
+   border would) rather than a strong opinionated style. */
+.notes-list-item.is-pinned {
+	padding: 0.7rem 1rem;
+    border-radius: 0.3rem;
+    background-color: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+	border-bottom:0;
+	margin-bottom: 1.2rem;
+}
+
 .notes-list-item:first-child {
 	padding-top: 0;
 }
@@ -144,16 +155,48 @@
 	margin-bottom: var(--size-2-1);
 }
 
+.notes-list-item-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--size-2-2);
+	margin-bottom: var(--size-2-2);
+}
+
 .notes-list-datetime {
-	display: inline-block;
 	font-size: var(--font-ui-small);
 	color: var(--text-accent);
 	text-decoration: none;
-	margin-bottom: var(--size-2-2);
 }
 
 .notes-list-datetime:hover {
 	text-decoration: underline;
+}
+
+.notes-list-pin-button {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border-radius: 50%;
+	background-color: transparent !important;
+	color: var(--icon-color);
+}
+
+.notes-list-pin-button:hover {
+	color: var(--icon-color-hover);
+}
+
+.notes-list-pin-button.is-pinned {
+	color: var(--text-accent);
+}
+
+.notes-list-pin-button svg {
+	width: 13px;
+	height: 13px;
 }
 
 .notes-list-content {

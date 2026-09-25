@@ -5,6 +5,7 @@ import {
 	Setting,
 	SettingGroup,
 	TAbstractFile,
+	TFile,
 	WorkspaceLeaf,
 	debounce,
 } from "obsidian";
@@ -61,6 +62,17 @@ export default class NotesListPlugin extends Plugin {
 		if (folderPath === "" || file.path.startsWith(folderPath)) {
 			this.requestRefresh();
 		}
+	}
+
+	// Pin state lives in the note's own frontmatter (a "pinned" property), not
+	// in plugin data, so it travels with the file across renames/moves/copies
+	// for free and needs no bookkeeping here. processFrontMatter is Obsidian's
+	// own safe read-modify-write helper — it creates the frontmatter block if
+	// the note doesn't have one yet.
+	async setPinned(file: TFile, pinned: boolean): Promise<void> {
+		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+			frontmatter.pinned = pinned;
+		});
 	}
 
 	async activateView(): Promise<void> {
