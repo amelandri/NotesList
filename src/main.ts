@@ -49,7 +49,9 @@ export default class NotesListPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on("modify", (f: TAbstractFile) => this.onVaultEvent(f)));
 		this.registerEvent(this.app.vault.on("create", (f: TAbstractFile) => this.onVaultEvent(f)));
 		this.registerEvent(this.app.vault.on("delete", (f: TAbstractFile) => this.onVaultEvent(f)));
-		this.registerEvent(this.app.vault.on("rename", (f: TAbstractFile) => this.onVaultEvent(f)));
+		this.registerEvent(
+			this.app.vault.on("rename", (f: TAbstractFile, oldPath: string) => this.onVaultEvent(f, oldPath))
+		);
 		this.registerEvent(this.app.metadataCache.on("changed", (f: TAbstractFile) => this.onVaultEvent(f)));
 	}
 
@@ -57,11 +59,30 @@ export default class NotesListPlugin extends Plugin {
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_NOTES_LIST);
 	}
 
-	private onVaultEvent(file: TAbstractFile): void {
-		const folderPath = this.settings.folderPath.replace(/^\/+|\/+$/g, "");
-		if (folderPath === "" || file.path.startsWith(folderPath)) {
+	// oldPath is only passed for "rename": a note can be renamed/moved *out* of
+	// the watched folder, and by then file.path is the new (out-of-scope) path,
+	// so checking that alone would miss it and leave the stale entry showing
+	// until some unrelated event happens to trigger a refresh.
+	private onVaultEvent(file: TAbstractFile, oldPath?: string): void {
+		if (this.isInScope(file.path) || (oldPath !== undefined && this.isInScope(oldPath))) {
 			this.requestRefresh();
 		}
+	}
+
+	// Mirrors NotesListView.getNotesInScope()'s own logic exactly (including the
+	// includeSubfolders branch), rather than a plain path.startsWith(folderPath)
+	// — that would also match e.g. a "NotesArchive/x.md" file against a "Notes"
+	// folder setting, triggering spurious full rescans for files never actually
+	// in scope.
+	private isInScope(path: string): boolean {
+		const folderPath = this.settings.folderPath.replace(/^\/+|\/+$/g, "");
+		if (folderPath === "") return true;
+		if (this.settings.includeSubfolders) {
+			return path === folderPath || path.startsWith(folderPath + "/");
+		}
+		const lastSlash = path.lastIndexOf("/");
+		const parent = lastSlash === -1 ? "" : path.slice(0, lastSlash);
+		return parent === folderPath;
 	}
 
 	// Pin state lives in the note's own frontmatter (a "pinned" property), not
@@ -185,8 +206,14 @@ class NotesListSettingTab extends PluginSettingTab {
 							.setValue(String(this.plugin.settings.previewLength))
 							.onChange(async (value) => {
 								const parsed = Number.parseInt(value, 10);
-								this.plugin.settings.previewLength = Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+								const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+								this.plugin.settings.previewLength = resolved;
 								await this.plugin.saveSettings();
+								// Reflect the corrected fallback back into the field itself
+								// (only when it actually differs) — otherwise an invalid
+								// value like "0" or "abc" keeps showing in the input even
+								// though 300 is what's actually in effect.
+								if (resolved !== parsed) text.setValue(String(resolved));
 							});
 					});
 			});
@@ -200,8 +227,10 @@ class NotesListSettingTab extends PluginSettingTab {
 					.setValue(String(this.plugin.settings.notesPerPage))
 					.onChange(async (value) => {
 						const parsed = Number.parseInt(value, 10);
-						this.plugin.settings.notesPerPage = Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+						const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+						this.plugin.settings.notesPerPage = resolved;
 						await this.plugin.saveSettings();
+						if (resolved !== parsed) text.setValue(String(resolved));
 					})
 			);
 	}

@@ -98,6 +98,22 @@
 	height: 10px;
 }
 
+.notes-list-active-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-2-2);
+	margin-top: var(--size-4-3);
+}
+
+/* Keeps the row's height reserved (visibility: hidden, not display: none) so
+   the Tags section below doesn't shift when a filter is toggled on/off — the
+   placeholder pill inside (real markup, just invisible) is what gives it the
+   correct height instead of a guessed fixed value. */
+.notes-list-active-filters.is-empty {
+	visibility: hidden;
+}
+
 .notes-list-new-note-button {
 	flex-shrink: 0;
 	display: flex;
@@ -122,8 +138,7 @@
 }
 
 .notes-list-item {
-	padding: 1.3rem 0;
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 3rem;
 	/* Obsidian sets `body { user-select: none }` globally and only re-enables
 	   selection on its own reading/editing views — custom ItemViews like this
 	   one aren't covered by that allowlist, so it has to be opted back in here. */
@@ -139,15 +154,7 @@
     border-radius: 0.3rem;
     background-color: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
 	border-bottom:0;
-	margin-bottom: 1.2rem;
-}
-
-.notes-list-item:first-child {
-	padding-top: 0;
-}
-
-.notes-list-item:last-child {
-	border-bottom: none;
+	margin-bottom: 3rem;
 }
 
 .notes-list-title {
@@ -164,7 +171,6 @@
 }
 
 .notes-list-datetime {
-	font-size: var(--font-ui-small);
 	color: var(--text-accent);
 	text-decoration: none;
 }
@@ -183,11 +189,11 @@
 	padding: 0;
 	border-radius: 50%;
 	background-color: transparent !important;
-	color: var(--icon-color);
+	color: var(--icon-color-hover) !important;
 }
 
 .notes-list-pin-button:hover {
-	color: var(--icon-color-hover);
+	color: var(--icon-color) !important;
 }
 
 .notes-list-pin-button.is-pinned {
@@ -201,6 +207,10 @@
 
 .notes-list-content {
 	color: color-mix(in srgb, var(--text-normal) 80%, transparent);
+}
+
+.notes-list-content p{
+	line-height: 1.4rem;
 }
 
 .notes-list-content > *:first-child {
@@ -438,4 +448,9 @@
 .notes-tag-tree-label.is-selected {
 	color: var(--text-accent);
 	font-weight: 600;
+}
+
+.notes-tag-tree-count {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
 }

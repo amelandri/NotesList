@@ -23,10 +23,19 @@ export function renderHeatmap(
 		const key = date.format("YYYY-MM-DD");
 		dayCounts.set(key, (dayCounts.get(key) ?? 0) + 1);
 	}
-	const maxCount = Math.max(0, ...dayCounts.values());
 
 	const today = moment().startOf("day");
 	const start = today.clone().subtract(RANGE_MONTHS, "months").startOf("week");
+
+	// Scaled from only the days actually drawn below (start..today), not every
+	// dayCounts entry — dates outside that window (e.g. a bulk import from a
+	// year ago) would otherwise dominate maxCount and flatten every visible
+	// cell's contrast down near "Less" even on the grid's own busiest day.
+	let maxCount = 0;
+	for (const cursor = start.clone(); cursor.isSameOrBefore(today, "day"); cursor.add(1, "day")) {
+		const count = dayCounts.get(cursor.format("YYYY-MM-DD")) ?? 0;
+		if (count > maxCount) maxCount = count;
+	}
 
 	container.empty();
 	container.addClass("notes-heatmap");

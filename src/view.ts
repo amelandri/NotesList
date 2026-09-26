@@ -58,6 +58,29 @@ interface NoteEntry {
 	pinned: boolean;
 }
 
+// Deliberately does NOT use metadataCache.getFileCache(file)?.frontmatterPosition
+// to find where the body starts. That offset comes from Obsidian's cached,
+// already-parsed metadata, which is re-parsed asynchronously after a write —
+// right after our own processFrontMatter() call (e.g. toggling a pin), a
+// render() can run before that re-parse lands, so the cached offset would
+// still be the *previous* frontmatter block's length. If the edit changed
+// that length by even one byte (e.g. "true" -> "false"), slicing at the stale
+// offset lands mid-frontmatter, so the "body" starts with a stray "-" from
+// the closing delimiter — which Markdown then renders as a bullet list item
+// for a moment, until the next refresh() re-reads it correctly. Deriving the
+// cut directly from the raw content we just read is immune to that race.
+//
+// The body group matches whole lines lazily ((?:.*\r?\n)*?), not [\s\S]*? —
+// that variant requires a *separate* newline before the closing "---", which
+// a completely empty frontmatter block ("---\n---\n", zero properties) never
+// has: its closing "---" sits right after the one newline that already ended
+// the opening line. Matching zero whole lines lets the closing delimiter be
+// found immediately in that case instead of the regex failing outright and
+// leaving both "---" lines to render as a stray bullet.
+function stripFrontmatter(raw: string): string {
+	return raw.replace(/^---\r?\n(?:.*\r?\n)*?---[ \t]*(?:\r?\n|$)/, "");
+}
+
 // "readableLineLength" is an undocumented internal Vault config key with no public
 // typings; Obsidian's own core reads/toggles it the same way (verified in app.js).
 interface VaultInternal {
@@ -179,8 +202,21 @@ export class NotesListView extends ItemView {
 	// Both forms are handled here rather than assuming the field is always a string.
 	private parseFrontmatterTime(value: unknown): { hour: number; minute: number; second: number } | null {
 		if (typeof value === "number" && Number.isFinite(value)) {
-			const totalMinutes = Math.trunc(value);
-			return { hour: Math.floor(totalMinutes / 60) % 24, minute: totalMinutes % 60, second: 0 };
+			const n = Math.trunc(value);
+			// The same grammar also resolves an unquoted 3-group "HH:mm:ss" (seconds
+			// included) to a base-60 number, but nested one level deeper:
+			// ((hour*60)+minute)*60+second, not hour*60+minute. We only ever see this
+			// resolved integer, never the original group count, so the two shapes are
+			// ambiguous in general — except a 2-group "HH:mm" can never resolve above
+			// 23*60+59 = 1439, so any larger value can only be a 3-group one (hour >= 1
+			// pushes it past 1439 on its own). Below that threshold, a 3-group value
+			// with hour 0 (e.g. "0:16:20") collides with a 2-group one of the same
+			// number (here, "16:20") — a residual, rare ambiguity (seconds specified,
+			// before 1am, unquoted) with no fix short of quoting the value.
+			if (n > 1439) {
+				return { hour: Math.floor(n / 3600) % 24, minute: Math.floor((n % 3600) / 60), second: n % 60 };
+			}
+			return { hour: Math.floor(n / 60) % 24, minute: n % 60, second: 0 };
 		}
 
 		if (value) {
@@ -250,35 +286,6 @@ export class NotesListView extends ItemView {
 		const titleGroup = header.createDiv({ cls: "notes-list-header-title-group" });
 		titleGroup.createEl("h4", { text: "Notes", cls: "notes-list-panel-title" });
 
-		if (this.selectedTag) {
-			this.renderFilterPill(titleGroup, `#${this.selectedTag}`, "Clear tag filter", () => {
-				this.selectedTag = null;
-				this.currentPage = 1;
-				void this.render();
-			});
-		}
-
-		if (this.selectedDate) {
-			this.renderFilterPill(titleGroup, moment(this.selectedDate).format("D MMM YYYY"), "Clear date filter", () => {
-				this.selectedDate = null;
-				this.currentPage = 1;
-				void this.render();
-			});
-		}
-
-		if (this.selectedMonth) {
-			this.renderFilterPill(
-				titleGroup,
-				moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY"),
-				"Clear month filter",
-				() => {
-					this.selectedMonth = null;
-					this.currentPage = 1;
-					void this.render();
-				}
-			);
-		}
-
 		const newNoteButton = header.createEl("button", {
 			cls: "notes-list-new-note-button",
 			attr: { "aria-label": "New note", type: "button" },
@@ -302,9 +309,11 @@ export class NotesListView extends ItemView {
 			const pageStart = (this.currentPage - 1) * notesPerPage;
 			const pageEntries = visibleEntries.slice(pageStart, pageStart + notesPerPage);
 
-			for (const entry of pageEntries) {
-				await this.renderEntry(mainEl, entry);
-			}
+			// Each renderEntry() call creates its own item/contentEl synchronously
+			// before its first await, so kicking them all off together (rather than
+			// awaiting one at a time) still appends them to mainEl in page order —
+			// only the async content-fill inside each one finishes out of order.
+			await Promise.all(pageEntries.map((entry) => this.renderEntry(mainEl, entry)));
 
 			this.renderPagination(mainEl, totalPages);
 		}
@@ -331,9 +340,56 @@ export class NotesListView extends ItemView {
 			heatmapSelection
 		);
 
+		// Always present (not just when a filter is active) and with a real
+		// pill's worth of markup inside even when empty, so its height is
+		// reserved and the Tags section below never shifts when a filter is
+		// toggled on/off. When nothing is selected, that placeholder pill is
+		// just hidden via CSS (.is-empty) rather than left out of the DOM.
+		const hasActiveFilter = Boolean(this.selectedTag || this.selectedDate || this.selectedMonth);
+		const activeFilters = heatmapPanel.createDiv({ cls: "notes-list-active-filters" });
+		activeFilters.toggleClass("is-empty", !hasActiveFilter);
+
+		if (this.selectedTag) {
+			this.renderFilterPill(activeFilters, `#${this.selectedTag}`, "Clear tag filter", () => {
+				this.selectedTag = null;
+				this.currentPage = 1;
+				void this.render();
+			});
+		}
+
+		if (this.selectedDate) {
+			this.renderFilterPill(
+				activeFilters,
+				moment(this.selectedDate).format("D MMM YYYY"),
+				"Clear date filter",
+				() => {
+					this.selectedDate = null;
+					this.currentPage = 1;
+					void this.render();
+				}
+			);
+		}
+
+		if (this.selectedMonth) {
+			this.renderFilterPill(
+				activeFilters,
+				moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY"),
+				"Clear month filter",
+				() => {
+					this.selectedMonth = null;
+					this.currentPage = 1;
+					void this.render();
+				}
+			);
+		}
+
+		if (!hasActiveFilter) {
+			this.renderFilterPill(activeFilters, "placeholder", "", () => {});
+		}
+
 		const tagPanel = heatmapPanel.createDiv({ cls: "notes-tag-tree-panel" });
 		tagPanel.createEl("h4", { text: "Tags", cls: "notes-list-panel-title" });
-		const tagTree = buildTagTree(allEntries.flatMap((e) => e.tags));
+		const tagTree = buildTagTree(allEntries.map((e) => e.tags));
 		renderTagTree(
 			tagPanel.createDiv({ cls: "notes-tag-tree" }),
 			tagTree,
@@ -457,6 +513,10 @@ export class NotesListView extends ItemView {
 			// metadataCache re-parses the frontmatter write asynchronously, so
 			// re-reading it immediately after could still see the old value.
 			entry.pinned = next;
+			// Pinning/unpinning reorders visibleEntries (pinned notes float to the
+			// top), same as any other action that reorders or refilters the list,
+			// so it resets to page 1 for consistency with those.
+			this.currentPage = 1;
 			void this.render();
 		});
 
@@ -467,8 +527,7 @@ export class NotesListView extends ItemView {
 		const contentEl = item.createDiv({ cls: "notes-list-content" });
 		const raw = await this.app.vault.cachedRead(file);
 		const cache = this.app.metadataCache.getFileCache(file);
-		const bodyStart = cache?.frontmatterPosition?.end?.offset ?? 0;
-		let body = raw.slice(bodyStart).trim();
+		let body = stripFrontmatter(raw).trim();
 
 		if (this.resolveContentDisplay(cache?.frontmatter) === "preview") {
 			const { previewLength } = this.plugin.settings;
