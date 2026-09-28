@@ -216,6 +216,17 @@ class NotesListSettingTab extends PluginSettingTab {
 								if (resolved !== parsed) text.setValue(String(resolved));
 							});
 					});
+			})
+			.addSetting((setting) => {
+				setting
+					.setName("Show date group headers")
+					.setDesc('Show "Today" / "Yesterday" / "This week" / "Older" headers above notes in the list.')
+					.addToggle((toggle) =>
+						toggle.setValue(this.plugin.settings.showDateGroups).onChange(async (value) => {
+							this.plugin.settings.showDateGroups = value;
+							await this.plugin.saveSettings();
+						})
+					);
 			});
 
 		new Setting(containerEl)

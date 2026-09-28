@@ -14,6 +14,8 @@ export interface NotesListSettings {
 	notesPerPage: number;
 	/** When to show each note's file name below its date. */
 	showNoteName: ShowNoteNameMode;
+	/** Whether to show Today/Yesterday/This week/Older group headers above the notes list. */
+	showDateGroups: boolean;
 }
 
 export const DEFAULT_SETTINGS: NotesListSettings = {
@@ -23,4 +25,5 @@ export const DEFAULT_SETTINGS: NotesListSettings = {
 	previewLength: 300,
 	notesPerPage: 10,
 	showNoteName: "whenDifferent",
+	showDateGroups: false,
 };

@@ -137,8 +137,29 @@
 	height: 14px;
 }
 
+.notes-list-date-group-header {
+	margin: var(--size-4-4) 0 1.5rem;
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-normal);
+	background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+	padding: 0.6rem 0.7rem 0.5rem 0.7rem;
+	border-radius: var(--radius-s);
+}
+
+/* .notes-list-header (the "Notes" title + new-note button row) already
+   reserves its own margin-bottom, so the very first group header — always
+   the one right after it — doesn't need to stack more spacing on top. */
+.notes-list-header + .notes-list-date-group-header {
+	margin-top: 0;
+}
+
 .notes-list-item {
-	margin-bottom: 3rem;
+	margin-bottom: 1.5rem;
+	padding-bottom: 1.5rem;
+	border-bottom: 1px solid var(--background-modifier-border);
 	/* Obsidian sets `body { user-select: none }` globally and only re-enables
 	   selection on its own reading/editing views — custom ItemViews like this
 	   one aren't covered by that allowlist, so it has to be opted back in here. */
@@ -171,6 +192,7 @@
 }
 
 .notes-list-datetime {
+	font-size: var(--font-ui-small);
 	color: var(--text-accent);
 	text-decoration: none;
 }
@@ -189,15 +211,22 @@
 	padding: 0;
 	border-radius: 50%;
 	background-color: transparent !important;
-	color: var(--icon-color-hover) !important;
+	/* !important on all three color rules below: Obsidian's own button/icon
+	   styles otherwise win the cascade over a plain single-class selector like
+	   this one, which is what made the muted/bold-on-hover/accent-when-pinned
+	   states fail to show at all before this. .is-pinned needs it too, or the
+	   base rule's !important would block it outright regardless of which one
+	   is more specific. */
+	color: var(--icon-color) !important;
+	cursor: pointer;
 }
 
 .notes-list-pin-button:hover {
-	color: var(--icon-color) !important;
+	color: var(--icon-color-hover) !important;
 }
 
 .notes-list-pin-button.is-pinned {
-	color: var(--text-accent);
+	color: var(--text-accent) !important;
 }
 
 .notes-list-pin-button svg {

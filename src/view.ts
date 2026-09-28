@@ -310,10 +310,33 @@ export class NotesListView extends ItemView {
 			const pageEntries = visibleEntries.slice(pageStart, pageStart + notesPerPage);
 
 			// Each renderEntry() call creates its own item/contentEl synchronously
-			// before its first await, so kicking them all off together (rather than
-			// awaiting one at a time) still appends them to mainEl in page order —
+			// before its first await, so calling it inside this loop (rather than
+			// awaiting one at a time) still appends it to mainEl in page order —
 			// only the async content-fill inside each one finishes out of order.
-			await Promise.all(pageEntries.map((entry) => this.renderEntry(mainEl, entry)));
+			// Group headers are inserted the same way, synchronously, between
+			// entries whose group differs from the one before it — recomputed
+			// fresh for every page rather than carried over from the previous one,
+			// so a group that spans a page boundary shows its header again at the
+			// top of the next page instead of tracking cross-page continuity.
+			// Pinned entries are skipped entirely (no header, and they don't count
+			// towards lastGroup either): they already float to their own spot at
+			// the top regardless of date, so grouping them by date alongside would
+			// either show a header out of order (an old pinned note ahead of
+			// today's) or force the *next*, unpinned entry to repeat a header it
+			// already showed above the pinned block.
+			const renders: Promise<void>[] = [];
+			let lastGroup: string | null = null;
+			for (const entry of pageEntries) {
+				if (this.plugin.settings.showDateGroups && !entry.pinned) {
+					const group = this.dateGroupLabel(entry.date);
+					if (group !== lastGroup) {
+						mainEl.createDiv({ cls: "notes-list-date-group-header", text: group });
+						lastGroup = group;
+					}
+				}
+				renders.push(this.renderEntry(mainEl, entry));
+			}
+			await Promise.all(renders);
 
 			this.renderPagination(mainEl, totalPages);
 		}
@@ -409,6 +432,20 @@ export class NotesListView extends ItemView {
 		);
 	}
 
+	// "Today" also catches a future-dated note (isSameOrAfter, not isSame) —
+	// none of the four labels the setting offers fit a note dated ahead of
+	// today, and folding it into "Today" avoids inventing a fifth one.
+	// weekStart uses moment's own locale-aware start of week, same as the
+	// heatmap's own week bucketing in heatmap.ts, so both agree on where a
+	// week begins.
+	private dateGroupLabel(date: moment.Moment): string {
+		const today = moment().startOf("day");
+		if (date.isSameOrAfter(today, "day")) return "Today";
+		if (date.isSame(today.clone().subtract(1, "day"), "day")) return "Yesterday";
+		if (date.isSameOrAfter(today.clone().startOf("week"), "day")) return "This week";
+		return "Older";
+	}
+
 	private buildEmptyMessage(): string {
 		const tagPart = this.selectedTag ? `tagged #${this.selectedTag}` : "";
 		const datePart = this.selectedDate ? `on ${moment(this.selectedDate).format("D MMM YYYY")}` : "";
@@ -491,6 +528,10 @@ export class NotesListView extends ItemView {
 
 		const itemHeader = item.createDiv({ cls: "notes-list-item-header" });
 
+		const openNote = (evt: MouseEvent) => {
+			this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
+		};
+
 		const link = itemHeader.createEl("a", {
 			text: date.format("YYYY-MM-DD HH:mm"),
 			cls: "notes-list-datetime internal-link",
@@ -498,14 +539,14 @@ export class NotesListView extends ItemView {
 		});
 		link.addEventListener("click", (evt) => {
 			evt.preventDefault();
-			this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
+			openNote(evt);
 		});
 
 		const pinButton = itemHeader.createEl("button", {
 			cls: "notes-list-pin-button" + (entry.pinned ? " is-pinned" : ""),
 			attr: { "aria-label": entry.pinned ? "Unpin note" : "Pin note", type: "button" },
 		});
-		setIcon(pinButton, "pin");
+		setIcon(pinButton, "bookmark");
 		pinButton.addEventListener("click", async () => {
 			const next = !entry.pinned;
 			await this.plugin.setPinned(file, next);
@@ -525,6 +566,14 @@ export class NotesListView extends ItemView {
 		}
 
 		const contentEl = item.createDiv({ cls: "notes-list-content" });
+		contentEl.addEventListener("dblclick", (evt) => {
+			// Don't also open *this* note over a link the rendered body already
+			// handles its own way (e.g. an internal link to some other note, or an
+			// external URL) — only open on a double-click that lands on plain body
+			// content.
+			if ((evt.target as HTMLElement).closest("a")) return;
+			openNote(evt);
+		});
 		const raw = await this.app.vault.cachedRead(file);
 		const cache = this.app.metadataCache.getFileCache(file);
 		let body = stripFrontmatter(raw).trim();
