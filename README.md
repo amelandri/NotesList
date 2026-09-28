@@ -6,6 +6,8 @@ An [Obsidian](https://obsidian.md) plugin that opens a custom view showing every
 
 > **Built with vibecoding.** This project is developed primarily through conversational, prompt-driven "vibecoding" with an AI coding assistant rather than hand-written from a spec. Expect the code and docs to evolve iteratively as new requests come in.
 
+![screenshot](images/screenshot.png)
+
 ## Features
 
 - **Configurable folder** — pick any vault folder to watch (with autocomplete), optionally including its subfolders.
