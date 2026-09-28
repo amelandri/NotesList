@@ -183,52 +183,50 @@ export class NotesListView extends ItemView {
 	private resolveDate(file: TFile, cache: CachedMetadata | null): moment.Moment {
 		const fm = cache?.frontmatter;
 
-		// fm.date may be a plain string, or a native Date object — YAML auto-casts an
-		// unquoted YYYY-MM-DD scalar to one. moment(...) accepts either; startOf("day")
-		// pins it to local midnight regardless (a Date's toString() is timezone-shifted
-		// and not reliably midnight on its own), giving the 00:00 default with no time.
-		const date = fm?.date ? moment(fm.date).startOf("day") : null;
+		const datetime = fm?.datetime ? this.parseDatetime(fm.datetime) : null;
+		if (datetime?.isValid()) return datetime;
 
-		if (date?.isValid()) {
-			const time = this.parseFrontmatterTime(fm?.time);
-			if (time) date.set(time);
-			return date;
-		}
+		// Legacy fallback for notes written before "datetime" replaced the old,
+		// separate "date"/"time" fields: only "date" is still read, and only as a
+		// date (never with a time-of-day) — "time" itself is no longer read at
+		// all. parseDatetime() already resolves a date-only value to local
+		// midnight on its own (see below), so there's nothing extra to do here.
+		const date = fm?.date ? this.parseDatetime(fm.date) : null;
+		if (date?.isValid()) return date;
 
 		return moment(file.stat.mtime);
 	}
 
-	// fm.time is usually an "HH:mm"/"HH:mm:ss" string, but an unquoted "HH:MM"-shaped
-	// scalar (e.g. "16:20") is legacy-YAML for a base-60 integer — 16*60+20 = 980 — not
-	// a time string, so Obsidian's frontmatter cache hands that back as the number 980.
-	// Both forms are handled here rather than assuming the field is always a string.
-	private parseFrontmatterTime(value: unknown): { hour: number; minute: number; second: number } | null {
-		if (typeof value === "number" && Number.isFinite(value)) {
-			const n = Math.trunc(value);
-			// The same grammar also resolves an unquoted 3-group "HH:mm:ss" (seconds
-			// included) to a base-60 number, but nested one level deeper:
-			// ((hour*60)+minute)*60+second, not hour*60+minute. We only ever see this
-			// resolved integer, never the original group count, so the two shapes are
-			// ambiguous in general — except a 2-group "HH:mm" can never resolve above
-			// 23*60+59 = 1439, so any larger value can only be a 3-group one (hour >= 1
-			// pushes it past 1439 on its own). Below that threshold, a 3-group value
-			// with hour 0 (e.g. "0:16:20") collides with a 2-group one of the same
-			// number (here, "16:20") — a residual, rare ambiguity (seconds specified,
-			// before 1am, unquoted) with no fix short of quoting the value.
-			if (n > 1439) {
-				return { hour: Math.floor(n / 3600) % 24, minute: Math.floor((n % 3600) / 60), second: n % 60 };
-			}
-			return { hour: Math.floor(n / 60) % 24, minute: n % 60, second: 0 };
+	// The normal case is a quoted string written by Obsidian's own "Date & time"
+	// (or plain "Date") property picker — always local wall-clock time, e.g.
+	// "2026-09-25T16:20:00" (or "2026-09-25" with no time at all) — parsed
+	// directly against those formats, with no conversion needed.
+	//
+	// An unquoted value typed by hand bypasses that: YAML 1.1's timestamp
+	// resolver auto-casts it to a native Date instead, always at exactly UTC
+	// midnight when the source text carried no time-of-day at all
+	// (Date.UTC(year, month, day) — hour/minute/second default to 0 with no
+	// exceptions), and to a real, non-midnight UTC time when it did. Checking
+	// the *UTC* time-of-day, not the local one, is what reliably tells those
+	// two cases apart: a date-only value's *local* representation is shifted
+	// away from midnight by whatever the runtime's UTC offset happens to be —
+	// exactly the artifact this needs to see past, not react to. (A genuinely
+	// embedded time is still off by that same offset, since the resolver has
+	// no notion of "local time" and always treats it as UTC — an unavoidable
+	// quirk of typing it unquoted; quoting the value sidesteps it entirely,
+	// which is what Obsidian's own property picker always does.)
+	private parseDatetime(raw: any): moment.Moment | null {
+		if (typeof raw === "string") {
+			const parsed = moment(raw, ["YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD"], true);
+			return parsed.isValid() ? parsed : null;
 		}
 
-		if (value) {
-			const parsed = moment(String(value), ["HH:mm", "HH:mm:ss"], true);
-			if (parsed.isValid()) {
-				return { hour: parsed.hour(), minute: parsed.minute(), second: parsed.second() };
-			}
+		const date = moment(raw);
+		if (!date.isValid()) return null;
+		if (date.clone().utc().format("HH:mm:ss") === "00:00:00") {
+			date.startOf("day");
 		}
-
-		return null;
+		return date;
 	}
 
 	// Full data reload: re-scans every note in scope (metadata, date, tags) —

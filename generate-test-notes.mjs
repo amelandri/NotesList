@@ -47,12 +47,12 @@ function pad(n) {
 	return String(n).padStart(2, "0");
 }
 
-function formatFrontmatterDate(d) {
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function formatFrontmatterTime(d) {
-	return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+// Same shape (and quoting) Obsidian's own "Date & time" property picker
+// writes: local wall-clock time, "YYYY-MM-DDTHH:mm:ss", quoted so it's read
+// back as a plain string rather than triggering YAML's own timestamp
+// auto-cast (see "Note dating convention" in CLAUDE.md).
+function formatFrontmatterDatetime(d) {
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 // Matches the filename pattern "Unique note creator" generates by default
@@ -71,7 +71,7 @@ for (let i = 0; i < count; i++) {
 		filePath = resolve(targetDir, `${stamp}-${suffix++}.md`);
 	}
 
-	const frontmatter = `---\ndate: ${formatFrontmatterDate(date)}\ntime: ${formatFrontmatterTime(date)}\n---\n\n`;
+	const frontmatter = `---\ndatetime: "${formatFrontmatterDatetime(date)}"\n---\n\n`;
 	writeFileSync(filePath, frontmatter + BODY + "\n", "utf8");
 }
 

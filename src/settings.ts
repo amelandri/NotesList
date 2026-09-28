@@ -2,6 +2,8 @@ export type ShowNoteNameMode = "never" | "always" | "whenDifferent";
 export type ContentDisplayMode = "full" | "preview";
 
 export interface NotesListSettings {
+	/** Bumped by migrateSettings() whenever this shape changes — see SETTINGS_MIGRATIONS below. */
+	settingsVersion: number;
 	/** Folder to watch, relative to the vault root. Empty = entire vault. */
 	folderPath: string;
 	/** Also include subfolders of folderPath. */
@@ -18,7 +20,49 @@ export interface NotesListSettings {
 	showDateGroups: boolean;
 }
 
+// Each entry migrates the raw data exactly as loaded from data.json — which,
+// for an old enough file, may carry fields no longer in NotesListSettings at
+// all — from its own array index (the settingsVersion it applies to) up to
+// the next one, mutating it in place. migrateSettings() runs every entry from
+// the file's saved settingsVersion (missing entirely = 0, i.e. every file
+// saved before this framework existed) onward, in order, so a very old file
+// runs all of them in sequence and a current one runs none. Add a new
+// function to the END of this array — never edit or remove an old one —
+// whenever a future settings-shape change needs the same treatment; the
+// current version is simply this array's length, so there's nothing else to
+// keep in sync by hand.
+const SETTINGS_MIGRATIONS: Array<(data: Record<string, unknown>) => void> = [
+	// v0 -> v1: contentPreviewChars (a single number — 0 meant "show full
+	// content", anything higher meant "preview", truncated to that many
+	// characters) was replaced by two separate fields, contentDisplay and
+	// previewLength (see "Content display" in CLAUDE.md).
+	(data) => {
+		if (!("contentPreviewChars" in data)) return;
+		const chars = data.contentPreviewChars;
+		const hasPreviewLength = typeof chars === "number" && chars > 0;
+		data.contentDisplay = hasPreviewLength ? "preview" : "full";
+		data.previewLength = hasPreviewLength ? chars : DEFAULT_SETTINGS.previewLength;
+		delete data.contentPreviewChars;
+	},
+];
+
+/**
+ * Mutates `data` (as loaded straight from data.json) up to the current
+ * settings shape, in place. Returns whether anything actually changed, so the
+ * caller can decide whether the migrated result is worth persisting right
+ * away rather than waiting for the next unrelated settings save.
+ */
+export function migrateSettings(data: Record<string, unknown>): boolean {
+	const savedVersion = typeof data.settingsVersion === "number" ? data.settingsVersion : 0;
+	for (let v = savedVersion; v < SETTINGS_MIGRATIONS.length; v++) {
+		SETTINGS_MIGRATIONS[v](data);
+	}
+	data.settingsVersion = SETTINGS_MIGRATIONS.length;
+	return savedVersion < SETTINGS_MIGRATIONS.length;
+}
+
 export const DEFAULT_SETTINGS: NotesListSettings = {
+	settingsVersion: SETTINGS_MIGRATIONS.length,
 	folderPath: "",
 	includeSubfolders: false,
 	contentDisplay: "preview",

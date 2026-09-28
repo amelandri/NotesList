@@ -7,7 +7,7 @@ Notes List turns a vault folder into a browsable timeline: a chronological list 
 ## Features
 
 - **Chronological list** — every note in a folder you choose (optionally including its subfolders), newest first. Each entry shows its date and time, an optional file name, and its content — full or a preview, your choice.
-- **Date from frontmatter** — a note's date and time come from its own `date`/`time` frontmatter properties, falling back to the file's last-modified time if those aren't set. Click the date to open the note.
+- **Date from frontmatter** — a note's date and time come from its own `datetime` property (set it via Obsidian's own "Date & time" property type in the Properties panel), falling back to the file's last-modified time if it isn't set. Click the date to open the note.
 - **Pin notes** — click the bookmark icon on a note to keep it pinned to the top of the list, ahead of everything else matching the current filter. The pin is stored as a `pinned` property in the note's own frontmatter, so it's visible in the note itself and travels with it across a rename or move.
 - **Date group headers** (optional) — "Today" / "Yesterday" / "This week" / "Older" labels above the list, so it's obvious at a glance when notes were written.
 - **Activity heatmap** — a GitHub-contributions-style grid of the last 6 months, shaded by how many notes were created each day. Click a day or a month label to filter the list down to it.
@@ -26,7 +26,7 @@ What it adds when enabled:
 - The **New Note** button creates a new, uniquely-named note in one click by triggering that core plugin's own command. If it's disabled, clicking the button just shows a notice asking you to enable it — nothing else in the plugin is affected.
 - The "Show note name" setting's *When different from unique note name* mode compares each note's file name against whatever format "Unique note creator" is currently configured to generate (read live from its own settings; defaults to `YYYYMMDDHHmm` if that plugin is disabled or left at its own default).
 
-Note dating is entirely independent of this: Notes List always reads each note's `date`/`time` frontmatter properties, falling back to the file's last-modified time if those aren't set.
+Note dating is entirely independent of this: Notes List always reads each note's own `datetime` property, falling back to the file's last-modified time if it isn't set.
 
 ## Installation
 
@@ -53,7 +53,7 @@ Requires Obsidian **1.11.0** or later. The settings tab groups related controls 
 | Notes display | Content display | *Full* / *Preview* (default); a note can override this with its own `content-display` frontmatter property. |
 | Notes display | Preview length | Max characters shown when Content display (or a note's own override) is *Preview* (default 300); the field stays enabled either way. |
 | Notes display | Show date group headers | Show "Today" / "Yesterday" / "This week" / "Older" headers above the list (default off). |
-| — | Notes per page | Number of notes shown per page in the list (default 10). |
+| Notes display | Notes per page | Number of notes shown per page in the list (default 10). |
 
 ## Development
 

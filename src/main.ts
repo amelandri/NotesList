@@ -2,15 +2,15 @@ import {
 	App,
 	Plugin,
 	PluginSettingTab,
-	Setting,
 	SettingGroup,
 	TAbstractFile,
+	TextComponent,
 	TFile,
 	WorkspaceLeaf,
 	debounce,
 	normalizePath,
 } from "obsidian";
-import { ContentDisplayMode, DEFAULT_SETTINGS, NotesListSettings, ShowNoteNameMode } from "./settings";
+import { ContentDisplayMode, DEFAULT_SETTINGS, NotesListSettings, ShowNoteNameMode, migrateSettings } from "./settings";
 import { FolderSuggest } from "./folderSuggest";
 import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
 
@@ -116,11 +116,20 @@ export default class NotesListPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const raw = ((await this.loadData()) ?? {}) as Record<string, unknown>;
+		// Mutates raw in place up to the current settings shape — see
+		// migrateSettings() in settings.ts for why this exists and how it's
+		// meant to be extended.
+		const migrated = migrateSettings(raw);
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, raw) as NotesListSettings;
 		// Re-normalize on every load too, not just when the setting is edited, so
 		// a folderPath saved by an older version of this plugin (before this
 		// normalization existed) still gets cleaned up on next launch.
 		this.settings.folderPath = normalizeFolderPath(this.settings.folderPath);
+		// Persist the migrated shape right away rather than waiting for the next
+		// unrelated settings change, so a legacy field like contentPreviewChars
+		// doesn't linger in data.json indefinitely.
+		if (migrated) await this.saveData(this.settings);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -213,20 +222,16 @@ class NotesListSettingTab extends PluginSettingTab {
 					.setName("Preview length")
 					.setDesc("Maximum number of characters shown when Content display is set to Preview.")
 					.addText((text) => {
-						text
-							.setPlaceholder("300")
-							.setValue(String(this.plugin.settings.previewLength))
-							.onChange(async (value) => {
-								const parsed = Number.parseInt(value, 10);
-								const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
-								this.plugin.settings.previewLength = resolved;
+						text.setPlaceholder("300").setValue(String(this.plugin.settings.previewLength));
+						this.bindClampedNumberInput(
+							text,
+							() => this.plugin.settings.previewLength,
+							async (value) => {
+								this.plugin.settings.previewLength = value;
 								await this.plugin.saveSettings();
-								// Reflect the corrected fallback back into the field itself
-								// (only when it actually differs) — otherwise an invalid
-								// value like "0" or "abc" keeps showing in the input even
-								// though 300 is what's actually in effect.
-								if (resolved !== parsed) text.setValue(String(resolved));
-							});
+							},
+							300
+						);
 					});
 			})
 			.addSetting((setting) => {
@@ -239,22 +244,45 @@ class NotesListSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						})
 					);
+			})
+			.addSetting((setting) => {
+				setting
+					.setName("Notes per page")
+					.setDesc("Number of notes shown per page in the list.")
+					.addText((text) => {
+						text.setPlaceholder("10").setValue(String(this.plugin.settings.notesPerPage));
+						this.bindClampedNumberInput(
+							text,
+							() => this.plugin.settings.notesPerPage,
+							async (value) => {
+								this.plugin.settings.notesPerPage = value;
+								await this.plugin.saveSettings();
+							},
+							10
+						);
+					});
 			});
+	}
 
-		new Setting(containerEl)
-			.setName("Notes per page")
-			.setDesc("Number of notes shown per page in the list.")
-			.addText((text) =>
-				text
-					.setPlaceholder("10")
-					.setValue(String(this.plugin.settings.notesPerPage))
-					.onChange(async (value) => {
-						const parsed = Number.parseInt(value, 10);
-						const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
-						this.plugin.settings.notesPerPage = resolved;
-						await this.plugin.saveSettings();
-						if (resolved !== parsed) text.setValue(String(resolved));
-					})
-			);
+	// Parses on every keystroke (so typing a valid number takes effect right
+	// away) but only snaps the field's *displayed* text back to the resolved
+	// value on blur, not immediately — correcting it mid-edit made it
+	// impossible to clear the field and type a new number, since deleting a
+	// digit already left it invalid (NaN) and the old behavior rewrote the
+	// input back to the fallback before the next keystroke could land.
+	private bindClampedNumberInput(
+		text: TextComponent,
+		getCurrent: () => number,
+		setResolved: (value: number) => Promise<void>,
+		fallback: number
+	): void {
+		text.onChange(async (value) => {
+			const parsed = Number.parseInt(value, 10);
+			const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+			await setResolved(resolved);
+		});
+		text.inputEl.addEventListener("blur", () => {
+			text.setValue(String(getCurrent()));
+		});
 	}
 }
