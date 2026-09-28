@@ -39,7 +39,7 @@ Requires Obsidian **1.11.0** or later. The settings tab groups related controls 
 | Folder and files | Folder | Vault folder to watch, empty = entire vault. |
 | Folder and files | Subfolders | Also show notes from subfolders of the chosen folder. |
 | Folder and files | Template | Optional note to start new notes from (empty = a blank note); the template must have a property named `timestamp` in its frontmatter. |
-| Folder and files | Unique note name format | moment.js format for the New Note button's auto-generated file name (default `YYYYMMDDHHmm`); also what "When different from unique note name" compares against. |
+| Folder and files | Unique note name format | moment.js format for the New Note button's auto-generated file name (default `YYYYMMDDHHmmss`); also what "When different from unique note name" compares against. |
 | Notes display | Show note name | *Never* / *Always* / *When different from unique note name* (default; see [Features](#features) above). |
 | Notes display | Content display | *Full* / *Preview* (default); a note can override this with its own `content-display` frontmatter property. |
 | Notes display | Preview length | Max characters shown when Content display (or a note's own override) is *Preview* (default 300); the field stays enabled either way. |

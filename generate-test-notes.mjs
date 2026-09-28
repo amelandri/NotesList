@@ -58,7 +58,7 @@ function formatFrontmatterTimestamp(d) {
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-// Matches this plugin's own default uniqueNoteNameFormat (YYYYMMDDHHmm), so
+// Matches this plugin's own default uniqueNoteNameFormat (YYYYMMDDHHmmss), so
 // generated notes look like ones the New Note button would create.
 function formatFilenameStamp(d) {
 	return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`;

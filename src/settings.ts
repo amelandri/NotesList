@@ -25,7 +25,7 @@ export interface NotesListSettings {
 }
 
 /** Fallback used whenever uniqueNoteNameFormat is blank — also this plugin's out-of-the-box default, matching the pattern Obsidian's own "Unique note creator" core plugin used to generate (this plugin no longer depends on or reads from it). */
-export const DEFAULT_UNIQUE_NOTE_NAME_FORMAT = "YYYYMMDDHHmm";
+export const DEFAULT_UNIQUE_NOTE_NAME_FORMAT = "YYYYMMDDHHmmss";
 
 // Each entry migrates the raw data exactly as loaded from data.json — which,
 // for an old enough file, may carry fields no longer in NotesListSettings at
