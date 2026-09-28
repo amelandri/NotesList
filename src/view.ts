@@ -165,16 +165,18 @@ export class NotesListView extends ItemView {
 		}
 	}
 
+	// folderPath is already normalized (see normalizeFolderPath() in main.ts —
+	// applied both when the setting is edited and on every plugin load, so a
+	// value saved before that normalization existed still gets cleaned up).
 	private getNotesInScope(): TFile[] {
 		const { folderPath, includeSubfolders } = this.plugin.settings;
-		const normalized = folderPath.replace(/^\/+|\/+$/g, "");
 
 		return this.app.vault.getMarkdownFiles().filter((file) => {
-			if (normalized === "") return true;
+			if (folderPath === "") return true;
 			if (includeSubfolders) {
-				return file.path === normalized || file.path.startsWith(normalized + "/");
+				return file.path === folderPath || file.path.startsWith(folderPath + "/");
 			}
-			return file.parent?.path === normalized;
+			return file.parent?.path === folderPath;
 		});
 	}
 

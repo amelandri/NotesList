@@ -8,10 +8,20 @@ import {
 	TFile,
 	WorkspaceLeaf,
 	debounce,
+	normalizePath,
 } from "obsidian";
 import { ContentDisplayMode, DEFAULT_SETTINGS, NotesListSettings, ShowNoteNameMode } from "./settings";
 import { FolderSuggest } from "./folderSuggest";
 import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
+
+// Obsidian's own path normalizer handles slashes, leading/trailing junk, and
+// Unicode/whitespace quirks a hand-typed folder path can carry — but it turns
+// a "" input into "/" (vault root as a path), which would break the "" =
+// entire vault sentinel used everywhere else, so that case is special-cased
+// ahead of it rather than trusted to round-trip through normalizePath as-is.
+function normalizeFolderPath(path: string): string {
+	return path.trim() === "" ? "" : normalizePath(path);
+}
 
 export default class NotesListPlugin extends Plugin {
 	settings!: NotesListSettings;
@@ -55,10 +65,6 @@ export default class NotesListPlugin extends Plugin {
 		this.registerEvent(this.app.metadataCache.on("changed", (f: TAbstractFile) => this.onVaultEvent(f)));
 	}
 
-	onunload(): void {
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_NOTES_LIST);
-	}
-
 	// oldPath is only passed for "rename": a note can be renamed/moved *out* of
 	// the watched folder, and by then file.path is the new (out-of-scope) path,
 	// so checking that alone would miss it and leave the stale entry showing
@@ -75,7 +81,9 @@ export default class NotesListPlugin extends Plugin {
 	// folder setting, triggering spurious full rescans for files never actually
 	// in scope.
 	private isInScope(path: string): boolean {
-		const folderPath = this.settings.folderPath.replace(/^\/+|\/+$/g, "");
+		// Already normalized by loadSettings()/the Folder setting's onChange, so
+		// no further trimming is needed here.
+		const folderPath = this.settings.folderPath;
 		if (folderPath === "") return true;
 		if (this.settings.includeSubfolders) {
 			return path === folderPath || path.startsWith(folderPath + "/");
@@ -109,6 +117,10 @@ export default class NotesListPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// Re-normalize on every load too, not just when the setting is edited, so
+		// a folderPath saved by an older version of this plugin (before this
+		// normalization existed) still gets cleaned up on next launch.
+		this.settings.folderPath = normalizeFolderPath(this.settings.folderPath);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -130,7 +142,7 @@ class NotesListSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new SettingGroup(containerEl)
-			.setHeading("Folder settings")
+			.setHeading("Folder")
 			.addSetting((setting) => {
 				setting
 					.setName("Folder")
@@ -141,7 +153,7 @@ class NotesListSettingTab extends PluginSettingTab {
 							.setPlaceholder("e.g. Journal")
 							.setValue(this.plugin.settings.folderPath)
 							.onChange(async (value) => {
-								this.plugin.settings.folderPath = value;
+								this.plugin.settings.folderPath = normalizeFolderPath(value);
 								await this.plugin.saveSettings();
 							});
 					});
@@ -162,7 +174,7 @@ class NotesListSettingTab extends PluginSettingTab {
 			});
 
 		new SettingGroup(containerEl)
-			.setHeading("Notes Display")
+			.setHeading("Notes display")
 			.addSetting((setting) => {
 				setting
 					.setName("Show note name")

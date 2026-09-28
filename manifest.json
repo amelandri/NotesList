@@ -3,8 +3,7 @@
 	"name": "Notes List",
 	"version": "0.1.0",
 	"minAppVersion": "1.11.0",
-	"description": "Shows the notes in a configurable folder in reverse chronological order, with date/time (linked to the note), content and tags.",
+	"description": "Show notes from a folder as a chronological list with an activity heatmap, tag browser, pinning, and date filters.",
 	"author": "Alessandro Melandri",
-	"authorUrl": "",
 	"isDesktopOnly": false
 }

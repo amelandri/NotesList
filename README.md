@@ -1,30 +1,21 @@
 # Notes List
 
-An [Obsidian](https://obsidian.md) plugin that opens a custom view showing every note in a configurable folder as a chronological, descending list — alongside a GitHub-style activity heatmap.
-
-> **Status: work in progress.** This plugin is under active, personal development and is **not published on Obsidian's official Community Plugins directory**. It must be installed manually (see below) and its features/settings may change at any time.
-
-> **Built with vibecoding.** This project is developed primarily through conversational, prompt-driven "vibecoding" with an AI coding assistant rather than hand-written from a spec. Expect the code and docs to evolve iteratively as new requests come in.
+Notes List turns a vault folder into a browsable timeline: a chronological list of its notes on one side, and a GitHub-style activity heatmap and tag browser on the other. It's a good fit for a daily journal, a work log, or any "one note per entry" habit, where seeing *when* things happened matters as much as the notes themselves.
 
 ![screenshot](images/screenshot.png)
 
 ## Features
 
-- **Configurable folder** — pick any vault folder to watch (with autocomplete), optionally including its subfolders.
-- **Chronological note list** — every note in scope, sorted newest first (pinned notes float to the top of the list, still newest-first among themselves — see **Pin notes** below), each entry showing:
-  - **date and time**, read from the note's `date`/`time` frontmatter properties, falling back to the file's last-modified time if those aren't set, rendered as a clickable link to the note, with a pin button aligned to the right of that same row;
-  - the note's **file name**, below the date — controlled by the "Show note name" setting: *Never*, *Always*, or *When different from unique note name* (the default), which hides it only for notes still using the auto-generated `YYYYMMDDHHmm` name from "Unique note creator" and shows it for anything renamed to something meaningful;
-  - the note's **rendered content** — full or a truncated preview, per the "Content display" setting (*Full* / *Preview*, with a configurable preview length). A note can override the setting for itself with its own `content-display: full` or `content-display: preview` frontmatter property.
-- **Pin notes** — the icon-only button on a note's date row pins it (click again to unpin). Among the notes currently matching any active tag/day/month filter, pinned ones sort to the top, ahead of everything else, in their own newest-first order — pinning doesn't bypass a filter, it only affects ordering within whatever the filter already shows. Pinned rows get a `.notes-list-item.is-pinned` CSS class (a subtle accent by default) — customize or remove the look with a CSS snippet. The pin is stored as a `pinned: true`/`pinned: false` property in the note's own frontmatter (not plugin data), so it's visible/editable directly in the note and travels with the file across a rename or move.
-- **Date group headers** (off by default, "Show date group headers" setting) — inserts "Today" / "Yesterday" / "This week" / "Older" labels above the list wherever the notes' dates cross into a new group, making it clearer at a glance when notes were created.
-- **Pagination** — the list is split into pages (size configurable, default 10). Page navigation appears at the bottom of the list only when there's more than one page: previous/next buttons plus up to 5 page numbers, kept centered around the current page as you move through a long list. Only the notes on the current page have their content actually read and rendered, so browsing a large folder stays fast regardless of how many notes are in scope.
-- **Fast on large folders** — scanning a folder's notes (reading each one's date/tags) only happens when the note set could actually have changed (opening the view, a note being created/edited/renamed/deleted, or a settings change). Changing page, expanding/collapsing a tag, or picking/clearing a tag/day/month filter reuses that scan instead of redoing it, so those stay instant even with several thousand notes in scope.
-- **New Note button** — a small circular `+` button next to the list title creates a new, uniquely-named note in one click (see [Unique note creator](#unique-note-creator-nice-to-have)).
-- **Activity heatmap** — a GitHub-contributions-style grid of the last 6 months, one cell per day, shaded by how many notes were created that day. It stays pinned in view while the notes list scrolls. Every cell has a tooltip showing its date, and clicking a cell filters the notes list down to that day (the cell is outlined to show it's the active filter). Clicking a month label instead filters down to every note in that month. The legend row ("Less"/"More") also shows the note count, right-aligned — the total in scope, or "*n* of *total*" while a tag/day/month filter narrows the list.
-- **Hierarchical tag browser** — below the heatmap, a nested, collapsible list of every tag found across the notes in scope (nested tags like `#area/work` render as a tree; branches with children can be collapsed/expanded with the chevron), each shown with the number of notes it matches, e.g. `work (5)` — counting a note once even if several of its tags fall under that same branch. Clicking a tag's name filters the notes list to notes carrying that tag or any of its nested sub-tags.
-- The tag, day and month filters can all be active at once, and each shows as its own pill below the heatmap, with an `x` to clear just that one and restore the rest of the list.
-- **Respects your Editor settings** — the notes column honors Obsidian's own "Readable line length" toggle (Settings → Editor), live.
-- Auto-refreshes when notes in the watched folder are created, edited, deleted, renamed, or have their frontmatter changed.
+- **Chronological list** — every note in a folder you choose (optionally including its subfolders), newest first. Each entry shows its date and time, an optional file name, and its content — full or a preview, your choice.
+- **Date from frontmatter** — a note's date and time come from its own `date`/`time` frontmatter properties, falling back to the file's last-modified time if those aren't set. Click the date to open the note.
+- **Pin notes** — click the bookmark icon on a note to keep it pinned to the top of the list, ahead of everything else matching the current filter. The pin is stored as a `pinned` property in the note's own frontmatter, so it's visible in the note itself and travels with it across a rename or move.
+- **Date group headers** (optional) — "Today" / "Yesterday" / "This week" / "Older" labels above the list, so it's obvious at a glance when notes were written.
+- **Activity heatmap** — a GitHub-contributions-style grid of the last 6 months, shaded by how many notes were created each day. Click a day or a month label to filter the list down to it.
+- **Tag browser** — a collapsible tree of every tag found in the notes in scope, each with a count of matching notes. Click a tag to filter the list to it (including its nested sub-tags, e.g. `#area/work` under `#area`).
+- **Combine filters** — the tag, day and month filters can all be active together, each with its own pill (and `x`) below the heatmap to clear just that one.
+- **Pagination** — long lists are split into pages, so browsing stays fast no matter how many notes are in the folder.
+- **New Note button** — create a new, uniquely-named note in one click (works with Obsidian's own "Unique note creator" core plugin — see below).
+- Respects Obsidian's own "Readable line length" setting, and refreshes automatically as notes in the folder are created, edited, deleted, renamed, or have their frontmatter changed.
 
 ## Unique note creator (nice to have)
 
@@ -56,12 +47,12 @@ Requires Obsidian **1.11.0** or later. The settings tab groups related controls 
 
 | Group | Setting | Description |
 | --- | --- | --- |
-| Folder settings | Folder | Vault folder to watch, empty = entire vault. |
-| Folder settings | Subfolders | Also show notes from subfolders of the chosen folder. |
-| Notes Display | Show note name | *Never* / *Always* / *When different from unique note name* (default; see [Features](#features) above). |
-| Notes Display | Content display | *Full* / *Preview* (default); a note can override this with its own `content-display` frontmatter property. |
-| Notes Display | Preview length | Max characters shown when Content display (or a note's own override) is *Preview* (default 300); the field stays enabled either way. |
-| Notes Display | Show date group headers | Show "Today" / "Yesterday" / "This week" / "Older" headers above the list (default off). |
+| Folder | Folder | Vault folder to watch, empty = entire vault. |
+| Folder | Subfolders | Also show notes from subfolders of the chosen folder. |
+| Notes display | Show note name | *Never* / *Always* / *When different from unique note name* (default; see [Features](#features) above). |
+| Notes display | Content display | *Full* / *Preview* (default); a note can override this with its own `content-display` frontmatter property. |
+| Notes display | Preview length | Max characters shown when Content display (or a note's own override) is *Preview* (default 300); the field stays enabled either way. |
+| Notes display | Show date group headers | Show "Today" / "Yesterday" / "This week" / "Older" headers above the list (default off). |
 | — | Notes per page | Number of notes shown per page in the list (default 10). |
 
 ## Development
