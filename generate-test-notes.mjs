@@ -50,13 +50,16 @@ function pad(n) {
 // Same shape (and quoting) Obsidian's own "Date & time" property picker
 // writes: local wall-clock time, "YYYY-MM-DDTHH:mm:ss", quoted so it's read
 // back as a plain string rather than triggering YAML's own timestamp
-// auto-cast (see "Note dating convention" in CLAUDE.md).
-function formatFrontmatterDatetime(d) {
+// auto-cast (see "Note dating convention" in CLAUDE.md). The frontmatter key
+// itself is "timestamp" — see "Self-contained note creation" in CLAUDE.md for
+// why it's not called "datetime" (that's Obsidian's own, fixed internal name
+// for this property *type*, not a name this plugin picked).
+function formatFrontmatterTimestamp(d) {
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-// Matches the filename pattern "Unique note creator" generates by default
-// (YYYYMMDDHHmm), so generated notes look like real ones.
+// Matches this plugin's own default uniqueNoteNameFormat (YYYYMMDDHHmm), so
+// generated notes look like ones the New Note button would create.
 function formatFilenameStamp(d) {
 	return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
@@ -71,7 +74,7 @@ for (let i = 0; i < count; i++) {
 		filePath = resolve(targetDir, `${stamp}-${suffix++}.md`);
 	}
 
-	const frontmatter = `---\ndatetime: "${formatFrontmatterDatetime(date)}"\n---\n\n`;
+	const frontmatter = `---\ntimestamp: "${formatFrontmatterTimestamp(date)}"\n---\n\n`;
 	writeFileSync(filePath, frontmatter + BODY + "\n", "utf8");
 }
 

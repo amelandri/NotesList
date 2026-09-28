@@ -12,43 +12,43 @@ import {
 	setIcon,
 } from "obsidian";
 import type NotesListPlugin from "./main";
-import type { ContentDisplayMode } from "./settings";
+import { DEFAULT_UNIQUE_NOTE_NAME_FORMAT, type ContentDisplayMode } from "./settings";
 import { renderHeatmap, type HeatmapSelection } from "./heatmap";
 import { buildTagTree, renderTagTree, tagMatchesFilter } from "./tagTree";
 
 export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
 
-// Command id registered by the "Unique note creator" core plugin (internal id
-// "zk-prefixer", formerly "Zettelkasten Prefixer" — verified in app.js). It has
-// no public typings, so it's invoked through app.commands, also undocumented.
-const UNIQUE_NOTE_CREATOR_COMMAND_ID = "zk-prefixer";
-
-// Default filename pattern "Unique note creator" falls back to when it has no
-// configured format of its own (verified in app.js: getFormat() reads
-// this.options.format and falls back to this same literal). Used only to tell
-// an auto-named note apart from a manually (re)named one for the "when
-// different" showNoteName mode — unrelated to date resolution, which comes
-// from frontmatter (see resolveDate()).
-const DEFAULT_UNIQUE_NOTE_NAME_FORMAT = "YYYYMMDDHHmm";
-
-interface InternalPlugins {
-	getEnabledPluginById(id: string): { options?: { format?: unknown } } | null;
-}
-
-function internalPlugins(app: App): InternalPlugins {
-	return (app as unknown as { internalPlugins: InternalPlugins }).internalPlugins;
-}
-
-// Reads the *actual* format "Unique note creator" is configured to generate
-// names with (its own settings tab, not a value we hardcode), so renamed-note
-// detection stays correct even if the user changed that format.
-function getUniqueNoteNameFormat(app: App): string {
-	const format = internalPlugins(app).getEnabledPluginById(UNIQUE_NOTE_CREATOR_COMMAND_ID)?.options?.format;
-	return typeof format === "string" && format ? format : DEFAULT_UNIQUE_NOTE_NAME_FORMAT;
-}
-
 function isUniqueNoteName(basename: string, format: string): boolean {
 	return moment(basename, format, true).isValid();
+}
+
+// Filesystem-illegal characters across platforms (Windows is the strictest),
+// swapped for a plain hyphen — a user-supplied uniqueNoteNameFormat could
+// otherwise place e.g. a literal "/" straight into the generated file name
+// (moment.js format tokens don't use it, but plain text in the format string
+// passes through verbatim), which would silently create the note in a
+// subfolder instead of failing loudly.
+function sanitizeFilenameSegment(name: string): string {
+	return name.replace(/[\\/:*?"<>|]/g, "-").trim() || "note";
+}
+
+// "metadataTypeManager" is an undocumented internal surface with no public
+// typings (verified in app.js) that Obsidian's own Properties panel uses to
+// remember which widget a property name should render with — "text", "date",
+// "datetime" (its fixed internal name for the "Date & time" picker; not to be
+// confused with this plugin's own "timestamp" property name below, which is
+// just the property this widget type happens to be assigned to), etc. —
+// persisted to .obsidian/types.json. setType() is what a property picker
+// calls the moment a value is set through it — calling it ourselves right
+// after writing "timestamp" via processFrontMatter means a brand new vault
+// shows the proper date+time picker for it immediately, without requiring a
+// template or a manual one-time Properties-panel edit.
+interface MetadataTypeManagerInternal {
+	setType(name: string, type: string): Promise<void>;
+}
+
+function internalMetadataTypeManager(app: App): MetadataTypeManagerInternal {
+	return (app as unknown as { metadataTypeManager: MetadataTypeManagerInternal }).metadataTypeManager;
 }
 
 interface NoteEntry {
@@ -90,14 +90,6 @@ interface VaultInternal {
 
 function internalVault(app: App): VaultInternal {
 	return app.vault as unknown as VaultInternal;
-}
-
-interface CommandsInternal {
-	executeCommandById(id: string): boolean;
-}
-
-function internalCommands(app: App): CommandsInternal {
-	return (app as unknown as { commands: CommandsInternal }).commands;
 }
 
 export class NotesListView extends ItemView {
@@ -158,14 +150,86 @@ export class NotesListView extends ItemView {
 		clearButton.addEventListener("click", onClear);
 	}
 
-	private createUniqueNote(): void {
-		const executed = internalCommands(this.app).executeCommandById(UNIQUE_NOTE_CREATOR_COMMAND_ID);
-		if (!executed) {
-			new Notice('Could not create the note: enable the "Unique note creator" core plugin in Obsidian settings.');
+	// Falls back to DEFAULT_UNIQUE_NOTE_NAME_FORMAT whenever the setting is
+	// blank, rather than persisting that fallback into the setting itself —
+	// used identically by note creation and by "whenDifferent" detection below,
+	// so the two always agree on what counts as an auto-generated name.
+	private uniqueNoteNameFormat(): string {
+		return this.plugin.settings.uniqueNoteNameFormat.trim() || DEFAULT_UNIQUE_NOTE_NAME_FORMAT;
+	}
+
+	private notePath(folderPath: string, basename: string): string {
+		return folderPath ? `${folderPath}/${basename}.md` : `${basename}.md`;
+	}
+
+	// If settings.templatePath is set, the template note's frontmatter must
+	// already declare a "timestamp" property (any value — it gets overwritten
+	// with "now" regardless, same as the no-template case) so the resulting
+	// note's shape is something the user actually configured, not silently
+	// invented. Returns null (after surfacing a Notice) when the template is
+	// unusable for any reason, which createUniqueNote() treats as "abort,
+	// don't create anything" rather than falling back to a blank note —
+	// misconfigured templatePath should be fixed, not silently ignored.
+	private async resolveTemplateContent(): Promise<string | null> {
+		const templatePath = this.plugin.settings.templatePath;
+		if (!templatePath) return "";
+
+		const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
+		if (!(templateFile instanceof TFile)) {
+			new Notice(`Notes List: template not found at "${templatePath}". Check the Template setting.`);
+			return null;
+		}
+
+		const frontmatter = this.app.metadataCache.getFileCache(templateFile)?.frontmatter;
+		if (!frontmatter || !("timestamp" in frontmatter)) {
+			new Notice(
+				`Notes List: the template note "${templatePath}" is missing a "timestamp" property in its frontmatter. Add one (any value) to use it as a template.`
+			);
+			return null;
+		}
+
+		return this.app.vault.cachedRead(templateFile);
+	}
+
+	// Self-contained: no longer depends on the "Unique note creator" core
+	// plugin at all, for naming or otherwise. Creates the note directly inside
+	// the watched folder (so it immediately shows up in the list), pre-fills
+	// "timestamp" to now, and registers that property's type so the Properties
+	// panel shows the proper date+time picker even in a brand new vault with
+	// no prior "timestamp" property and no template.
+	private async createUniqueNote(): Promise<void> {
+		try {
+			const content = await this.resolveTemplateContent();
+			if (content === null) return;
+
+			const folderPath = this.plugin.settings.folderPath;
+			if (folderPath && !this.app.vault.getAbstractFileByPath(folderPath)) {
+				await this.app.vault.createFolder(folderPath);
+			}
+
+			const stamp = sanitizeFilenameSegment(moment().format(this.uniqueNoteNameFormat()));
+			let basename = stamp;
+			for (let suffix = 2; this.app.vault.getAbstractFileByPath(this.notePath(folderPath, basename)); suffix++) {
+				basename = `${stamp}-${suffix}`;
+			}
+
+			const file = await this.app.vault.create(this.notePath(folderPath, basename), content);
+			await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+				frontmatter.timestamp = moment().format("YYYY-MM-DDTHH:mm:ss");
+			});
+			// The second argument is Obsidian's own fixed internal widget-type
+			// name for its "Date & time" picker (see MetadataTypeManagerInternal
+			// above) — it's not related to, and doesn't need to match, the
+			// property name in the first argument.
+			await internalMetadataTypeManager(this.app).setType("timestamp", "datetime");
+			await this.app.workspace.getLeaf(false).openFile(file);
+		} catch (error) {
+			console.error("Notes List: failed to create a new note", error);
+			new Notice("Could not create the note — see the developer console for details.");
 		}
 	}
 
-	// folderPath is already normalized (see normalizeFolderPath() in main.ts —
+	// folderPath is already normalized (see normalizeOptionalPath() in main.ts —
 	// applied both when the setting is edited and on every plugin load, so a
 	// value saved before that normalization existed still gets cleaned up).
 	private getNotesInScope(): TFile[] {
@@ -183,10 +247,10 @@ export class NotesListView extends ItemView {
 	private resolveDate(file: TFile, cache: CachedMetadata | null): moment.Moment {
 		const fm = cache?.frontmatter;
 
-		const datetime = fm?.datetime ? this.parseDatetime(fm.datetime) : null;
-		if (datetime?.isValid()) return datetime;
+		const timestamp = fm?.timestamp ? this.parseDatetime(fm.timestamp) : null;
+		if (timestamp?.isValid()) return timestamp;
 
-		// Legacy fallback for notes written before "datetime" replaced the old,
+		// Legacy fallback for notes written before "timestamp" replaced the old,
 		// separate "date"/"time" fields: only "date" is still read, and only as a
 		// date (never with a time-of-day) — "time" itself is no longer read at
 		// all. parseDatetime() already resolves a date-only value to local
@@ -291,7 +355,7 @@ export class NotesListView extends ItemView {
 			attr: { "aria-label": "New note", type: "button" },
 		});
 		setIcon(newNoteButton, "plus");
-		newNoteButton.addEventListener("click", () => this.createUniqueNote());
+		newNoteButton.addEventListener("click", () => void this.createUniqueNote());
 
 		if (visibleEntries.length === 0) {
 			mainEl.createEl("p", {
@@ -507,7 +571,7 @@ export class NotesListView extends ItemView {
 			case "always":
 				return true;
 			case "whenDifferent":
-				return !isUniqueNoteName(file.basename, getUniqueNoteNameFormat(this.app));
+				return !isUniqueNoteName(file.basename, this.uniqueNoteNameFormat());
 			case "never":
 			default:
 				return false;

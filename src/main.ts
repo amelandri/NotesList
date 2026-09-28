@@ -10,16 +10,25 @@ import {
 	debounce,
 	normalizePath,
 } from "obsidian";
-import { ContentDisplayMode, DEFAULT_SETTINGS, NotesListSettings, ShowNoteNameMode, migrateSettings } from "./settings";
+import {
+	ContentDisplayMode,
+	DEFAULT_SETTINGS,
+	DEFAULT_UNIQUE_NOTE_NAME_FORMAT,
+	NotesListSettings,
+	ShowNoteNameMode,
+	migrateSettings,
+} from "./settings";
 import { FolderSuggest } from "./folderSuggest";
+import { TemplateSuggest } from "./templateSuggest";
 import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
 
 // Obsidian's own path normalizer handles slashes, leading/trailing junk, and
-// Unicode/whitespace quirks a hand-typed folder path can carry — but it turns
-// a "" input into "/" (vault root as a path), which would break the "" =
-// entire vault sentinel used everywhere else, so that case is special-cased
-// ahead of it rather than trusted to round-trip through normalizePath as-is.
-function normalizeFolderPath(path: string): string {
+// Unicode/whitespace quirks a hand-typed path can carry — but it turns a ""
+// input into "/" (vault root as a path), which would break the "" = "not set"
+// sentinel both folderPath (entire vault) and templatePath (no template) rely
+// on, so that case is special-cased ahead of it rather than trusted to
+// round-trip through normalizePath as-is. Shared by both settings below.
+function normalizeOptionalPath(path: string): string {
 	return path.trim() === "" ? "" : normalizePath(path);
 }
 
@@ -125,7 +134,8 @@ export default class NotesListPlugin extends Plugin {
 		// Re-normalize on every load too, not just when the setting is edited, so
 		// a folderPath saved by an older version of this plugin (before this
 		// normalization existed) still gets cleaned up on next launch.
-		this.settings.folderPath = normalizeFolderPath(this.settings.folderPath);
+		this.settings.folderPath = normalizeOptionalPath(this.settings.folderPath);
+		this.settings.templatePath = normalizeOptionalPath(this.settings.templatePath);
 		// Persist the migrated shape right away rather than waiting for the next
 		// unrelated settings change, so a legacy field like contentPreviewChars
 		// doesn't linger in data.json indefinitely.
@@ -151,7 +161,7 @@ class NotesListSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new SettingGroup(containerEl)
-			.setHeading("Folder")
+			.setHeading("Folder and files")
 			.addSetting((setting) => {
 				setting
 					.setName("Folder")
@@ -162,7 +172,7 @@ class NotesListSettingTab extends PluginSettingTab {
 							.setPlaceholder("e.g. Journal")
 							.setValue(this.plugin.settings.folderPath)
 							.onChange(async (value) => {
-								this.plugin.settings.folderPath = normalizeFolderPath(value);
+								this.plugin.settings.folderPath = normalizeOptionalPath(value);
 								await this.plugin.saveSettings();
 							});
 					});
@@ -177,6 +187,39 @@ class NotesListSettingTab extends PluginSettingTab {
 							.setValue(this.plugin.settings.includeSubfolders)
 							.onChange(async (value) => {
 								this.plugin.settings.includeSubfolders = value;
+								await this.plugin.saveSettings();
+							})
+					);
+			})
+			.addSetting((setting) => {
+				setting
+					.setName("Template")
+					.setDesc(
+						'Optional note to use as a template for new notes created with the New Note button (empty = a blank note). The template must have a "timestamp" property in its frontmatter.'
+					)
+					.addText((text) => {
+						new TemplateSuggest(this.app, text.inputEl);
+						text
+							.setPlaceholder("e.g. Templates/Daily note")
+							.setValue(this.plugin.settings.templatePath)
+							.onChange(async (value) => {
+								this.plugin.settings.templatePath = normalizeOptionalPath(value);
+								await this.plugin.saveSettings();
+							});
+					});
+			})
+			.addSetting((setting) => {
+				setting
+					.setName("Unique note name format")
+					.setDesc(
+						"moment.js format for the New Note button's auto-generated file name, and for recognizing a note as still using it (\"Show note name\" below)."
+					)
+					.addText((text) =>
+						text
+							.setPlaceholder(DEFAULT_UNIQUE_NOTE_NAME_FORMAT)
+							.setValue(this.plugin.settings.uniqueNoteNameFormat)
+							.onChange(async (value) => {
+								this.plugin.settings.uniqueNoteNameFormat = value;
 								await this.plugin.saveSettings();
 							})
 					);

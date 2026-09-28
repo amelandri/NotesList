@@ -18,7 +18,14 @@ export interface NotesListSettings {
 	showNoteName: ShowNoteNameMode;
 	/** Whether to show Today/Yesterday/This week/Older group headers above the notes list. */
 	showDateGroups: boolean;
+	/** moment.js format for the New Note button's auto-generated file name, and for recognizing a note as still using it (showNoteName: "whenDifferent"). */
+	uniqueNoteNameFormat: string;
+	/** Vault-relative path to a note used as a template for new notes (New Note button). Empty = no template, a blank note. The template's frontmatter must contain a "timestamp" property. */
+	templatePath: string;
 }
+
+/** Fallback used whenever uniqueNoteNameFormat is blank — also this plugin's out-of-the-box default, matching the pattern Obsidian's own "Unique note creator" core plugin used to generate (this plugin no longer depends on or reads from it). */
+export const DEFAULT_UNIQUE_NOTE_NAME_FORMAT = "YYYYMMDDHHmm";
 
 // Each entry migrates the raw data exactly as loaded from data.json — which,
 // for an old enough file, may carry fields no longer in NotesListSettings at
@@ -70,4 +77,6 @@ export const DEFAULT_SETTINGS: NotesListSettings = {
 	notesPerPage: 10,
 	showNoteName: "whenDifferent",
 	showDateGroups: false,
+	uniqueNoteNameFormat: DEFAULT_UNIQUE_NOTE_NAME_FORMAT,
+	templatePath: "",
 };
