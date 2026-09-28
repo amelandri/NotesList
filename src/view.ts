@@ -217,11 +217,23 @@ export class NotesListView extends ItemView {
 			await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
 				frontmatter.timestamp = moment().format("YYYY-MM-DDTHH:mm:ss");
 			});
+
+			// Isolated in its own try/catch, deliberately: the note itself is
+			// already fully created and correctly dated by this point, so a
+			// failure here (metadataTypeManager is undocumented and could change
+			// in a future Obsidian release) should degrade to "no auto-registered
+			// picker widget" rather than being reported as "failed to create the
+			// note" — which would be misleading, since it already exists on disk.
 			// The second argument is Obsidian's own fixed internal widget-type
 			// name for its "Date & time" picker (see MetadataTypeManagerInternal
 			// above) — it's not related to, and doesn't need to match, the
 			// property name in the first argument.
-			await internalMetadataTypeManager(this.app).setType("timestamp", "datetime");
+			try {
+				await internalMetadataTypeManager(this.app).setType("timestamp", "datetime");
+			} catch (error) {
+				console.warn('Notes List: could not register "timestamp" as a Date & time property', error);
+			}
+
 			await this.app.workspace.getLeaf(false).openFile(file);
 		} catch (error) {
 			console.error("Notes List: failed to create a new note", error);
