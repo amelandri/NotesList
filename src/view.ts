@@ -565,13 +565,17 @@ export class NotesListView extends ItemView {
 			item.createDiv({ text: file.basename, cls: "notes-list-title" });
 		}
 
-		const contentEl = item.createDiv({ cls: "notes-list-content" });
+		// "markdown-rendered" is the class Obsidian's own reading view puts on
+		// rendered Markdown: its app.css scopes table, code block (pre/code) and
+		// copy-code-button styles under it (".markdown-rendered table", etc.), so
+		// without it MarkdownRenderer's output falls back to bare browser styles.
+		const contentEl = item.createDiv({ cls: "notes-list-content markdown-rendered" });
 		contentEl.addEventListener("dblclick", (evt) => {
-			// Don't also open *this* note over a link the rendered body already
-			// handles its own way (e.g. an internal link to some other note, or an
-			// external URL) — only open on a double-click that lands on plain body
-			// content.
-			if ((evt.target as HTMLElement).closest("a")) return;
+			// Don't also open *this* note over a link or button the rendered body
+			// already handles its own way (e.g. an internal link to some other
+			// note, an external URL, or a code block's copy button) — only open on
+			// a double-click that lands on plain body content.
+			if ((evt.target as HTMLElement).closest("a, button")) return;
 			openNote(evt);
 		});
 		const raw = await this.app.vault.cachedRead(file);
