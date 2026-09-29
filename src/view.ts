@@ -20,6 +20,10 @@ import { SearchIndex, parseSearchQuery } from "./searchIndex";
 
 export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
 
+// Below this pane width (px) the two columns stack into one. Roughly the
+// sidebar's own width (the heatmap sets it) plus a usable notes column.
+const NARROW_LAYOUT_MAX_WIDTH = 720;
+
 export function isUniqueNoteName(basename: string, format: string): boolean {
 	return moment(basename, format, true).isValid();
 }
@@ -207,6 +211,10 @@ export class NotesListView extends ItemView {
 	// shows up immediately instead of being masked by earlier clicks.
 	private tagCollapseOverrides = new Map<string, boolean>();
 	private appliedTagTreeExpandLevel: TagTreeExpandLevel | null = null;
+	// Whether the whole Tags section is folded away. Only honored in the
+	// single-column (narrow) layout, where an expanded tree would push the
+	// notes list off screen; the two-column layout always shows it.
+	private tagPanelCollapsed = true;
 	private currentPage = 1;
 	// Full-text search (see searchIndex.ts). searchQuery is the submitted text
 	// (also what the input shows after a re-render, since render() rebuilds
@@ -274,6 +282,16 @@ export class NotesListView extends ItemView {
 			this.focusSearch();
 			return false;
 		});
+		// Single-column layout below NARROW_LAYOUT_MAX_WIDTH (see styles.css,
+		// .is-narrow). Based on the pane's own width rather than on the device,
+		// so a narrow pane on desktop gets it too, and a phone rotated to a wide
+		// landscape doesn't. contentEl survives render()'s empty(), so the class
+		// only has to change when the width crosses the threshold.
+		const resizeObserver = new ResizeObserver(() => {
+			this.contentEl.toggleClass("is-narrow", this.isNarrowLayout());
+		});
+		resizeObserver.observe(this.contentEl);
+		this.register(() => resizeObserver.disconnect());
 		this.registerEvent(
 			internalVault(this.app).on("config-changed", (key) => {
 				// Only affects the is-readable-line-width CSS class — no need to
@@ -286,6 +304,10 @@ export class NotesListView extends ItemView {
 
 	async onClose(): Promise<void> {
 		this.markdownComponent.unload();
+	}
+
+	private isNarrowLayout(): boolean {
+		return this.contentEl.clientWidth < NARROW_LAYOUT_MAX_WIDTH;
 	}
 
 	private isReadableLineWidthEnabled(): boolean {
@@ -514,7 +536,8 @@ export class NotesListView extends ItemView {
 
 		this.renderSearchForm(heatmapPanel, searchFocus);
 
-		heatmapPanel.createEl("h4", { text: "Activity", cls: "notes-list-panel-title" });
+		const activityPanel = heatmapPanel.createDiv({ cls: "notes-list-activity" });
+		activityPanel.createEl("h4", { text: "Activity", cls: "notes-list-panel-title" });
 		const heatmapSelection: HeatmapSelection = {
 			selectedDate: this.selectedDate,
 			onSelectDate: (date) => {
@@ -530,7 +553,7 @@ export class NotesListView extends ItemView {
 			},
 		};
 		renderHeatmap(
-			heatmapPanel.createDiv(),
+			activityPanel.createDiv(),
 			allEntries.map((e) => e.date),
 			visibleEntries.length,
 			heatmapSelection
@@ -588,7 +611,17 @@ export class NotesListView extends ItemView {
 		}
 
 		const tagPanel = heatmapPanel.createDiv({ cls: "notes-tag-tree-panel" });
-		tagPanel.createEl("h4", { text: "Tags", cls: "notes-list-panel-title" });
+		tagPanel.toggleClass("is-collapsed", this.tagPanelCollapsed);
+		// A disclosure toggle only in the narrow layout (the chevron is hidden
+		// and clicks are ignored otherwise, see styles.css).
+		const tagHeader = tagPanel.createDiv({ cls: "notes-tag-tree-header" });
+		tagHeader.createEl("h4", { text: "Tags", cls: "notes-list-panel-title" });
+		setIcon(tagHeader.createSpan({ cls: "notes-tag-tree-header-toggle" }), "chevron-down");
+		tagHeader.addEventListener("click", () => {
+			if (!this.isNarrowLayout()) return;
+			this.tagPanelCollapsed = !this.tagPanelCollapsed;
+			void this.render();
+		});
 		const tagTree = buildTagTree(allEntries.map((e) => e.tags));
 		const expandLevel = this.plugin.settings.tagTreeExpandLevel;
 		if (expandLevel !== this.appliedTagTreeExpandLevel) {
@@ -603,6 +636,9 @@ export class NotesListView extends ItemView {
 			(path) => {
 				this.selectedTag = path;
 				this.currentPage = 1;
+				// Fold the section back in the narrow layout, so the filtered list
+				// is right there; its filter pill stays visible above.
+				this.tagPanelCollapsed = true;
 				void this.render();
 			},
 			(path, collapsed) => {

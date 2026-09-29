@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The view is now usable on phones and in narrow panes: below 720 px of width it switches to a single column with search, heatmap, active filters, tags and then the notes list. In this layout the Tags section is collapsible, collapsed by default, and folds back after a tag is selected, and the heatmap stretches to the full width.
+
 ## [0.2.0] - 2026-09-29
 
 ### Added
