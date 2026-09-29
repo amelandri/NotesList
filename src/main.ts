@@ -271,7 +271,7 @@ export default class NotesListPlugin extends Plugin {
 			leaf = workspace.getLeaf("tab");
 			await leaf.setViewState({ type: VIEW_TYPE_NOTES_LIST, active: true });
 		}
-		workspace.revealLeaf(leaf);
+		await workspace.revealLeaf(leaf);
 	}
 
 	async loadSettings(): Promise<void> {
@@ -280,7 +280,7 @@ export default class NotesListPlugin extends Plugin {
 		// migrateSettings() in settings.ts for why this exists and how it's
 		// meant to be extended.
 		const migrated = migrateSettings(raw);
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, raw) as NotesListSettings;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, raw);
 		// Re-normalize on every load too, not just when the setting is edited, so
 		// a folderPath saved by an older version of this plugin (before this
 		// normalization existed) still gets cleaned up on next launch.

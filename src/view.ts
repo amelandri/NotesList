@@ -1,6 +1,7 @@
 import {
 	App,
 	CachedMetadata,
+	Component,
 	EventRef,
 	ItemView,
 	MarkdownRenderer,
@@ -132,6 +133,13 @@ export class NotesListView extends ItemView {
 	// refresh() (vault/metadata changes, settings changes, initial open)
 	// rebuilds it.
 	private cachedEntries: NoteEntry[] = [];
+	// The Component passed to MarkdownRenderer.render() for every note's body —
+	// deliberately its own short-lived Component, not the plugin itself (whose
+	// lifecycle spans the whole Obsidian session): replaced at the start of
+	// every render() (see there) so whatever MarkdownRenderer registered
+	// against the *previous* pass's now-discarded DOM gets unloaded first,
+	// rather than accumulating for as long as the plugin stays enabled.
+	private markdownComponent = new Component();
 
 	constructor(leaf: WorkspaceLeaf, plugin: NotesListPlugin) {
 		super(leaf);
@@ -159,6 +167,10 @@ export class NotesListView extends ItemView {
 			})
 		);
 		await this.refresh();
+	}
+
+	async onClose(): Promise<void> {
+		this.markdownComponent.unload();
 	}
 
 	private isReadableLineWidthEnabled(): boolean {
@@ -232,6 +244,12 @@ export class NotesListView extends ItemView {
 	}
 
 	private async render(): Promise<void> {
+		// Unload whatever the *previous* render() pass registered against its
+		// now-discarded DOM (see the field comment above) before this pass's
+		// renderEntry() calls start registering against a fresh one.
+		this.markdownComponent.unload();
+		this.markdownComponent = new Component();
+
 		const { notesPerPage } = this.plugin.settings;
 		const allEntries = this.cachedEntries;
 
@@ -487,6 +505,20 @@ export class NotesListView extends ItemView {
 		return this.plugin.settings.contentDisplay;
 	}
 
+	private async togglePin(entry: NoteEntry, file: TFile): Promise<void> {
+		const next = !entry.pinned;
+		await this.plugin.setPinned(file, next);
+		// Update the cached entry in place rather than re-scanning: Obsidian's
+		// metadataCache re-parses the frontmatter write asynchronously, so
+		// re-reading it immediately after could still see the old value.
+		entry.pinned = next;
+		// Pinning/unpinning reorders visibleEntries (pinned notes float to the
+		// top), same as any other action that reorders or refilters the list,
+		// so it resets to page 1 for consistency with those.
+		this.currentPage = 1;
+		void this.render();
+	}
+
 	private async renderEntry(container: HTMLElement, entry: NoteEntry): Promise<void> {
 		const { file, date } = entry;
 		const item = container.createDiv({ cls: "notes-list-item" + (entry.pinned ? " is-pinned" : "") });
@@ -494,7 +526,7 @@ export class NotesListView extends ItemView {
 		const itemHeader = item.createDiv({ cls: "notes-list-item-header" });
 
 		const openNote = (evt: MouseEvent) => {
-			this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
+			void this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
 		};
 
 		const link = itemHeader.createEl("a", {
@@ -518,19 +550,13 @@ export class NotesListView extends ItemView {
 			attr: { "aria-label": entry.pinned ? "Unpin note" : "Pin note", type: "button" },
 		});
 		setIcon(pinButton, "bookmark");
-		pinButton.addEventListener("click", async () => {
-			const next = !entry.pinned;
-			await this.plugin.setPinned(file, next);
-			// Update the cached entry in place rather than re-scanning: Obsidian's
-			// metadataCache re-parses the frontmatter write asynchronously, so
-			// re-reading it immediately after could still see the old value.
-			entry.pinned = next;
-			// Pinning/unpinning reorders visibleEntries (pinned notes float to the
-			// top), same as any other action that reorders or refilters the list,
-			// so it resets to page 1 for consistency with those.
-			this.currentPage = 1;
-			void this.render();
-		});
+		// A plain (non-async) callback, deliberately: addEventListener's own
+		// listener type expects a void return, not a Promise — an async
+		// function passed directly there would still run, but its rejection
+		// (if setPinned ever throws) would go entirely unhandled. Delegating to
+		// an async method and voiding *that* call keeps the same fire-and-forget
+		// behavior while making the "not awaiting this on purpose" explicit.
+		pinButton.addEventListener("click", () => void this.togglePin(entry, file));
 
 		if (this.shouldShowNoteName(file)) {
 			item.createDiv({ text: file.basename, cls: "notes-list-title" });
@@ -556,6 +582,6 @@ export class NotesListView extends ItemView {
 			}
 		}
 
-		await MarkdownRenderer.render(this.app, body, contentEl, file.path, this.plugin);
+		await MarkdownRenderer.render(this.app, body, contentEl, file.path, this.markdownComponent);
 	}
 }
