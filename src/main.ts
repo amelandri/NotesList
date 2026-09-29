@@ -3,9 +3,8 @@ import {
 	Notice,
 	Plugin,
 	PluginSettingTab,
-	SettingGroup,
+	SettingDefinitionItem,
 	TAbstractFile,
-	TextComponent,
 	TFile,
 	WorkspaceLeaf,
 	debounce,
@@ -20,8 +19,6 @@ import {
 	ShowNoteNameMode,
 	migrateSettings,
 } from "./settings";
-import { FolderSuggest } from "./folderSuggest";
-import { TemplateSuggest } from "./templateSuggest";
 import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
 
 // Obsidian's own path normalizer handles slashes, leading/trailing junk, and
@@ -48,6 +45,12 @@ export function sanitizeFilenameSegment(name: string): string {
 // value is blank, rather than persisting that fallback into the setting
 // itself. A free function (not a method) so it's directly testable without
 // a plugin instance.
+// Shared validator for both "number" settings (Preview length, Notes per
+// page): returning a message rejects the value instead of persisting it.
+export function validatePositiveInteger(value: number): string | void {
+	if (!Number.isInteger(value) || value < 1) return "Enter a whole number greater than 0.";
+}
+
 export function resolveUniqueNoteNameFormat(configured: string): string {
 	return configured.trim() || DEFAULT_UNIQUE_NOTE_NAME_FORMAT;
 }
@@ -165,7 +168,7 @@ export default class NotesListPlugin extends Plugin {
 	// own safe read-modify-write helper — it creates the frontmatter block if
 	// the note doesn't have one yet.
 	async setPinned(file: TFile, pinned: boolean): Promise<void> {
-		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+		await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 			frontmatter.pinned = pinned;
 		});
 	}
@@ -236,7 +239,7 @@ export default class NotesListPlugin extends Plugin {
 			}
 
 			const file = await this.app.vault.create(this.notePath(folderPath, basename), content);
-			await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+			await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 				frontmatter.timestamp = moment().format("YYYY-MM-DDTHH:mm:ss");
 			});
 
@@ -298,6 +301,11 @@ export default class NotesListPlugin extends Plugin {
 	}
 }
 
+// Declarative settings API (Obsidian 1.13.0+, hence manifest.json's
+// minAppVersion): Obsidian renders these definitions itself and indexes them
+// for its in-app settings search, which an imperative display() can't offer.
+// The built-in "folder"/"file" controls bring their own vault suggesters, and
+// "number" handles parsing, so no hand-rolled equivalents are needed here.
 class NotesListSettingTab extends PluginSettingTab {
 	plugin: NotesListPlugin;
 
@@ -306,176 +314,110 @@ class NotesListSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		new SettingGroup(containerEl)
-			.setHeading("Folder and files")
-			.addSetting((setting) => {
-				setting
-					.setName("Folder")
-					.setDesc("Vault folder to watch (empty = entire vault)")
-					.addText((text) => {
-						new FolderSuggest(this.app, text.inputEl);
-						text
-							.setPlaceholder("e.g. Journal")
-							.setValue(this.plugin.settings.folderPath)
-							.onChange(async (value) => {
-								this.plugin.settings.folderPath = normalizeOptionalPath(value);
-								await this.plugin.saveSettings();
-							});
-					});
-			})
-			.addSetting((setting) => {
-				setting
-					.setName("Subfolders")
-					.setDesc("includes its subfolders.")
-					.addToggle((toggle) =>
-						toggle
-							.setTooltip("Include subfolders")
-							.setValue(this.plugin.settings.includeSubfolders)
-							.onChange(async (value) => {
-								this.plugin.settings.includeSubfolders = value;
-								await this.plugin.saveSettings();
-							})
-					);
-			})
-			.addSetting((setting) => {
-				setting
-					.setName("Template")
-					.setDesc(
-						'Optional note to use as a template for new notes created with the New Note button (empty = a blank note). The template must have a "timestamp" property in its frontmatter.'
-					)
-					.addText((text) => {
-						new TemplateSuggest(this.app, text.inputEl);
-						text
-							.setPlaceholder("e.g. Templates/Daily note")
-							.setValue(this.plugin.settings.templatePath)
-							.onChange(async (value) => {
-								this.plugin.settings.templatePath = normalizeOptionalPath(value);
-								await this.plugin.saveSettings();
-							});
-					});
-			})
-			.addSetting((setting) => {
-				setting
-					.setName("Unique note name format")
-					.setDesc(
-						"moment.js format for the New Note button's auto-generated file name, and for recognizing a note as still using it (\"Show note name\" below)."
-					)
-					.addText((text) =>
-						text
-							.setPlaceholder(DEFAULT_UNIQUE_NOTE_NAME_FORMAT)
-							.setValue(this.plugin.settings.uniqueNoteNameFormat)
-							.onChange(async (value) => {
-								this.plugin.settings.uniqueNoteNameFormat = value;
-								await this.plugin.saveSettings();
-							})
-					);
-			});
-
-		new SettingGroup(containerEl)
-			.setHeading("Notes display")
-			.addSetting((setting) => {
-				setting
-					.setName("Show note name")
-					.setDesc("Whether to show each note's file name.")
-					.addDropdown((dropdown) =>
-						dropdown
-							.addOption("never", "Never")
-							.addOption("always", "Always")
-							.addOption("whenDifferent", "When different from unique note name")
-							.setValue(this.plugin.settings.showNoteName)
-							.onChange(async (value) => {
-								this.plugin.settings.showNoteName = value as ShowNoteNameMode;
-								await this.plugin.saveSettings();
-							})
-					);
-			})
-			.addSetting((setting) => {
-				setting
-					.setName("Content display")
-					.setDesc(
-						'Show a note\'s full content or a truncated preview. A note can override this with "content-display" frontmatter property.'
-					)
-					.addDropdown((dropdown) =>
-						dropdown
-							.addOption("full", "Full")
-							.addOption("preview", "Preview")
-							.setValue(this.plugin.settings.contentDisplay)
-							.onChange(async (value) => {
-								this.plugin.settings.contentDisplay = value as ContentDisplayMode;
-								await this.plugin.saveSettings();
-							})
-					);
-			})
-			.addSetting((setting) => {
-				setting
-					.setName("Preview length")
-					.setDesc("Maximum number of characters shown when Content display is set to Preview.")
-					.addText((text) => {
-						text.setPlaceholder("300").setValue(String(this.plugin.settings.previewLength));
-						this.bindClampedNumberInput(
-							text,
-							() => this.plugin.settings.previewLength,
-							async (value) => {
-								this.plugin.settings.previewLength = value;
-								await this.plugin.saveSettings();
-							},
-							300
-						);
-					});
-			})
-			.addSetting((setting) => {
-				setting
-					.setName("Show date group headers")
-					.setDesc('Show "Today" / "Yesterday" / "This week" / "Older" headers above notes in the list.')
-					.addToggle((toggle) =>
-						toggle.setValue(this.plugin.settings.showDateGroups).onChange(async (value) => {
-							this.plugin.settings.showDateGroups = value;
-							await this.plugin.saveSettings();
-						})
-					);
-			})
-			.addSetting((setting) => {
-				setting
-					.setName("Notes per page")
-					.setDesc("Number of notes shown per page in the list.")
-					.addText((text) => {
-						text.setPlaceholder("10").setValue(String(this.plugin.settings.notesPerPage));
-						this.bindClampedNumberInput(
-							text,
-							() => this.plugin.settings.notesPerPage,
-							async (value) => {
-								this.plugin.settings.notesPerPage = value;
-								await this.plugin.saveSettings();
-							},
-							10
-						);
-					});
-			});
+	getSettingDefinitions(): SettingDefinitionItem<keyof NotesListSettings>[] {
+		return [
+			{
+				type: "group",
+				heading: "Folder and files",
+				items: [
+					{
+						name: "Folder",
+						desc: "Vault folder to watch (empty = entire vault)",
+						control: { type: "folder", key: "folderPath", placeholder: "e.g. Journal" },
+					},
+					{
+						name: "Subfolders",
+						desc: "includes its subfolders.",
+						control: { type: "toggle", key: "includeSubfolders" },
+					},
+					{
+						name: "Template",
+						desc: 'Optional note to use as a template for new notes created with the New Note button (empty = a blank note). The template must have a "timestamp" property in its frontmatter.',
+						control: {
+							type: "file",
+							key: "templatePath",
+							placeholder: "e.g. Templates/Daily note.md",
+							filter: (file) => file.extension === "md",
+						},
+					},
+					{
+						name: "Unique note name format",
+						desc: "moment.js format for the New Note button's auto-generated file name, and for recognizing a note as still using it (\"Show note name\" below).",
+						control: { type: "text", key: "uniqueNoteNameFormat", placeholder: DEFAULT_UNIQUE_NOTE_NAME_FORMAT },
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Notes display",
+				items: [
+					{
+						name: "Show note name",
+						desc: "Whether to show each note's file name.",
+						control: {
+							type: "dropdown",
+							key: "showNoteName",
+							options: {
+								never: "Never",
+								always: "Always",
+								whenDifferent: "When different from unique note name",
+							} satisfies Record<ShowNoteNameMode, string>,
+						},
+					},
+					{
+						name: "Content display",
+						desc: 'Show a note\'s full content or a truncated preview. A note can override this with "content-display" frontmatter property.',
+						control: {
+							type: "dropdown",
+							key: "contentDisplay",
+							options: { full: "Full", preview: "Preview" } satisfies Record<ContentDisplayMode, string>,
+						},
+					},
+					{
+						name: "Preview length",
+						desc: "Maximum number of characters shown when Content display is set to Preview.",
+						control: {
+							type: "number",
+							key: "previewLength",
+							defaultValue: DEFAULT_SETTINGS.previewLength,
+							min: 1,
+							step: 1,
+							validate: validatePositiveInteger,
+						},
+					},
+					{
+						name: "Show date group headers",
+						desc: 'Show "Today" / "Yesterday" / "This week" / "Older" headers above notes in the list.',
+						control: { type: "toggle", key: "showDateGroups" },
+					},
+					{
+						name: "Notes per page",
+						desc: "Number of notes shown per page in the list.",
+						control: {
+							type: "number",
+							key: "notesPerPage",
+							defaultValue: DEFAULT_SETTINGS.notesPerPage,
+							min: 1,
+							step: 1,
+							validate: validatePositiveInteger,
+						},
+					},
+				],
+			},
+		];
 	}
 
-	// Parses on every keystroke (so typing a valid number takes effect right
-	// away) but only snaps the field's *displayed* text back to the resolved
-	// value on blur, not immediately — correcting it mid-edit made it
-	// impossible to clear the field and type a new number, since deleting a
-	// digit already left it invalid (NaN) and the old behavior rewrote the
-	// input back to the fallback before the next keystroke could land.
-	private bindClampedNumberInput(
-		text: TextComponent,
-		getCurrent: () => number,
-		setResolved: (value: number) => Promise<void>,
-		fallback: number
-	): void {
-		text.onChange(async (value) => {
-			const parsed = Number.parseInt(value, 10);
-			const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-			await setResolved(resolved);
-		});
-		text.inputEl.addEventListener("blur", () => {
-			text.setValue(String(getCurrent()));
-		});
+	getControlValue(key: string): unknown {
+		return this.plugin.settings[key as keyof NotesListSettings];
+	}
+
+	// Overridden (rather than relying on PluginSettingTab's default persist) so
+	// every change goes through saveSettings() — which also refreshes any open
+	// Notes List view — and so both path settings keep the same normalization
+	// loadSettings() applies on every load.
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		const settings = this.plugin.settings as unknown as Record<string, unknown>;
+		settings[key] = key === "folderPath" || key === "templatePath" ? normalizeOptionalPath(typeof value === "string" ? value : "") : value;
+		await this.plugin.saveSettings();
 	}
 }

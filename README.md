@@ -34,7 +34,7 @@ For local development, `npm run deploy` builds and copies those three files stra
 
 ## Settings
 
-Requires Obsidian **1.11.0** or later. The settings tab groups related controls under a shared heading:
+Requires Obsidian **1.13.0** or later. The settings tab groups related controls under a shared heading, and every setting can be found through Obsidian's settings search:
 
 | Group | Setting | Description |
 | --- | --- | --- |

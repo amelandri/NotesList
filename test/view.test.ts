@@ -50,6 +50,13 @@ describe("parseDatetime", () => {
 	it("returns null for an unparseable value", () => {
 		expect(parseDatetime(new Date(NaN))).toBeNull();
 	});
+
+	it("rejects non-string, non-Date values instead of guessing at them", () => {
+		expect(parseDatetime(2026)).toBeNull();
+		expect(parseDatetime(["2026-09-25"])).toBeNull();
+		expect(parseDatetime(null)).toBeNull();
+		expect(parseDatetime(undefined)).toBeNull();
+	});
 });
 
 describe("dateGroupLabel", () => {

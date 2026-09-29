@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeOptionalPath, resolveUniqueNoteNameFormat, sanitizeFilenameSegment } from "../src/main";
+import { normalizeOptionalPath, resolveUniqueNoteNameFormat, sanitizeFilenameSegment, validatePositiveInteger } from "../src/main";
 import { DEFAULT_UNIQUE_NOTE_NAME_FORMAT } from "../src/settings";
 
 describe("normalizeOptionalPath", () => {
@@ -57,5 +57,18 @@ describe("resolveUniqueNoteNameFormat", () => {
 
 	it("passes a real configured format through unchanged", () => {
 		expect(resolveUniqueNoteNameFormat("YYYY-MM-DD")).toBe("YYYY-MM-DD");
+	});
+});
+
+describe("validatePositiveInteger", () => {
+	it("accepts a whole number of at least 1", () => {
+		expect(validatePositiveInteger(1)).toBeUndefined();
+		expect(validatePositiveInteger(300)).toBeUndefined();
+	});
+
+	it("rejects zero, negatives, fractions and NaN with a message", () => {
+		for (const value of [0, -5, 2.5, Number.NaN]) {
+			expect(validatePositiveInteger(value)).toEqual(expect.any(String));
+		}
 	});
 });

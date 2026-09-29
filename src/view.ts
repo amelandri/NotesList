@@ -80,10 +80,13 @@ export function parseDatetime(raw: unknown): moment.Moment | null {
 		return parsed.isValid() ? parsed : null;
 	}
 
-	// Anything else is trusted to be a native Date (or another moment()-
-	// compatible shape) — the only other thing YAML's timestamp resolver
-	// ever hands back for an unquoted value, per the comment above.
-	const date = moment(raw as moment.MomentInput);
+	// Besides a string, the only other thing YAML's timestamp resolver ever
+	// hands back for an unquoted value is a native Date, per the comment
+	// above. Anything else (a number, a list, ...) isn't a date this plugin
+	// can interpret, so it's rejected (falling back to mtime) rather than
+	// handed to moment(), which would e.g. read a bare number as epoch ms.
+	if (!(raw instanceof Date)) return null;
+	const date = moment(raw);
 	if (!date.isValid()) return null;
 	if (date.clone().utc().format("HH:mm:ss") === "00:00:00") {
 		date.startOf("day");
