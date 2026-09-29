@@ -1,6 +1,6 @@
 import moment from "moment";
 import { describe, expect, it } from "vitest";
-import { dateGroupLabel, isUniqueNoteName, parseDatetime, stripFrontmatter } from "../src/view";
+import { dateGroupLabel, findUnbreakableBlocks, isUniqueNoteName, parseDatetime, stripFrontmatter, truncateMarkdown } from "../src/view";
 
 describe("parseDatetime", () => {
 	it("parses a quoted string with seconds at face value, in local time", () => {
@@ -125,5 +125,68 @@ describe("stripFrontmatter", () => {
 	it("handles CRLF line endings", () => {
 		const raw = "---\r\ntimestamp: \"2026-09-25T16:20:00\"\r\n---\r\nBody text.";
 		expect(stripFrontmatter(raw)).toBe("Body text.");
+	});
+});
+
+describe("findUnbreakableBlocks", () => {
+	it("finds a fenced code block, from its opening to its closing fence", () => {
+		const body = "intro\n```ts\nconst x = 1;\n```\nafter";
+		const blocks = findUnbreakableBlocks(body);
+		expect(blocks).toHaveLength(1);
+		expect(body.slice(...blocks[0])).toBe("```ts\nconst x = 1;\n```");
+	});
+
+	it("runs an unclosed fence to the end of the body", () => {
+		const body = "intro\n~~~\ncode";
+		expect(findUnbreakableBlocks(body)).toEqual([[6, body.length]]);
+	});
+
+	it("only closes a fence with the same character, at least as long", () => {
+		const body = "````\n```\n~~~\n````";
+		expect(findUnbreakableBlocks(body)).toEqual([[0, body.length]]);
+	});
+
+	it("finds a table from its header row through its last row", () => {
+		const body = "intro\n\n| a | b |\n| --- | :-: |\n| 1 | 2 |\n| 3 | 4 |\n\nafter";
+		const [[start, end]] = findUnbreakableBlocks(body);
+		expect(body.slice(start, end)).toBe("| a | b |\n| --- | :-: |\n| 1 | 2 |\n| 3 | 4 |");
+	});
+
+	it("doesn't mistake a setext heading or thematic break for a table", () => {
+		expect(findUnbreakableBlocks("a | b\n---\ntext")).toEqual([]);
+	});
+
+	it("treats a table-looking block inside a code fence as code only", () => {
+		const body = "```\n| a | b |\n| - | - |\n```";
+		expect(findUnbreakableBlocks(body)).toEqual([[0, body.length]]);
+	});
+});
+
+describe("truncateMarkdown", () => {
+	it("returns a body within the limit unchanged", () => {
+		expect(truncateMarkdown("short", 10)).toBe("short");
+	});
+
+	it("cuts plain text at the limit, with an inline ellipsis", () => {
+		expect(truncateMarkdown("hello world", 5)).toBe("hello…");
+	});
+
+	it("moves a cut inside a code block to right after it, ellipsis on its own paragraph", () => {
+		const body = "intro\n```\nline one\nline two\n```\nmore text after";
+		expect(truncateMarkdown(body, 12)).toBe("intro\n```\nline one\nline two\n```\n\n…");
+	});
+
+	it("moves a cut inside a table to right after its last row", () => {
+		const body = "| a | b |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n\nmore text after";
+		expect(truncateMarkdown(body, 25)).toBe("| a | b |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n\n…");
+	});
+
+	it("returns the whole body, with no ellipsis, when the protected block is the last thing in it", () => {
+		const body = "intro\n```\nline one\nline two\n```\n";
+		expect(truncateMarkdown(body, 12)).toBe(body);
+	});
+
+	it("still cuts normally before a block that starts after the limit", () => {
+		expect(truncateMarkdown("hello world\n```\ncode\n```", 5)).toBe("hello…");
 	});
 });

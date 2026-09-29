@@ -52,6 +52,71 @@ export function stripFrontmatter(raw: string): string {
 	return raw.replace(/^---\r?\n(?:.*\r?\n)*?---[ \t]*(?:\r?\n|$)/, "");
 }
 
+// A GFM table's delimiter row ("| --- | :-: |", "--- | ---", ...). A pipe is
+// required on the line itself, so a bare "---" (a thematic break, or a setext
+// heading underline) is never mistaken for one.
+const TABLE_DELIMITER_ROW = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
+const FENCE_OPENING = /^ {0,3}(`{3,}|~{3,})/;
+
+// [start, end) character ranges of every fenced code block and table in
+// `body` — Markdown that renders as garbage (an unclosed fence swallowing the
+// rest of the preview, a table with a half-row) if cut partway through.
+// Scanned line by line in document order, so a table-looking line inside a
+// code block is correctly treated as code, and the ranges come out sorted and
+// non-overlapping. An unclosed fence runs to the end of the body, same as
+// Obsidian renders it.
+export function findUnbreakableBlocks(body: string): Array<[number, number]> {
+	const lines: Array<{ start: number; end: number; text: string }> = [];
+	let offset = 0;
+	for (const text of body.split("\n")) {
+		lines.push({ start: offset, end: offset + text.length, text });
+		offset += text.length + 1;
+	}
+
+	const blocks: Array<[number, number]> = [];
+	for (let i = 0; i < lines.length; i++) {
+		const fence = FENCE_OPENING.exec(lines[i].text);
+		if (fence) {
+			const marker = fence[1];
+			const closing = new RegExp(`^ {0,3}${marker[0] === "`" ? "`" : "~"}{${marker.length},}\\s*$`);
+			let j = i + 1;
+			while (j < lines.length && !closing.test(lines[j].text)) j++;
+			j = Math.min(j, lines.length - 1);
+			blocks.push([lines[i].start, lines[j].end]);
+			i = j;
+			continue;
+		}
+
+		const next = lines[i + 1];
+		if (lines[i].text.includes("|") && next && next.text.includes("|") && TABLE_DELIMITER_ROW.test(next.text)) {
+			let j = i + 1;
+			while (j + 1 < lines.length && lines[j + 1].text.trim() !== "" && lines[j + 1].text.includes("|")) j++;
+			blocks.push([lines[i].start, lines[j].end]);
+			i = j;
+		}
+	}
+	return blocks;
+}
+
+// Cuts `body` to about `maxLength` characters for "preview" mode, but never
+// inside a code block or table (see findUnbreakableBlocks): a cut that would
+// land in one is moved to right after it instead, so the preview can run
+// longer than maxLength by up to that one block. The ellipsis goes on its own
+// paragraph in that case — appended straight onto the closing "```" it would
+// stop that line being a valid closing fence, and onto a table's last row it
+// would end up inside a cell. If the block is the last thing in the body,
+// there's nothing left to cut, so the whole body is returned with no ellipsis.
+export function truncateMarkdown(body: string, maxLength: number): string {
+	if (body.length <= maxLength) return body;
+
+	const block = findUnbreakableBlocks(body).find(([start, end]) => start < maxLength && maxLength < end);
+	if (!block) return body.slice(0, maxLength).trimEnd() + "…";
+
+	const blockEnd = block[1];
+	if (body.slice(blockEnd).trim() === "") return body;
+	return body.slice(0, blockEnd).trimEnd() + "\n\n…";
+}
+
 // Doesn't depend on any view/plugin state — a free function (not a method)
 // so it can be unit-tested directly, and reused as-is from resolveDate()
 // below.
@@ -583,10 +648,7 @@ export class NotesListView extends ItemView {
 		let body = stripFrontmatter(raw).trim();
 
 		if (this.resolveContentDisplay(cache?.frontmatter) === "preview") {
-			const { previewLength } = this.plugin.settings;
-			if (body.length > previewLength) {
-				body = body.slice(0, previewLength).trim() + "…";
-			}
+			body = truncateMarkdown(body, this.plugin.settings.previewLength);
 		}
 
 		await MarkdownRenderer.render(this.app, body, contentEl, file.path, this.markdownComponent);
