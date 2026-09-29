@@ -8,13 +8,13 @@ import {
 	TFile,
 	WorkspaceLeaf,
 	getAllTags,
-	moment,
 	setIcon,
 } from "obsidian";
 import type NotesListPlugin from "./main";
 import type { ContentDisplayMode } from "./settings";
 import { renderHeatmap, type HeatmapSelection } from "./heatmap";
 import { buildTagTree, renderTagTree, tagMatchesFilter } from "./tagTree";
+import { Moment, moment } from "./moment";
 
 export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
 
@@ -24,7 +24,7 @@ export function isUniqueNoteName(basename: string, format: string): boolean {
 
 interface NoteEntry {
 	file: TFile;
-	date: moment.Moment;
+	date: Moment;
 	tags: string[];
 	pinned: boolean;
 }
@@ -74,7 +74,7 @@ export function stripFrontmatter(raw: string): string {
 // no notion of "local time" and always treats it as UTC — an unavoidable
 // quirk of typing it unquoted; quoting the value sidesteps it entirely,
 // which is what Obsidian's own property picker always does.)
-export function parseDatetime(raw: unknown): moment.Moment | null {
+export function parseDatetime(raw: unknown): Moment | null {
 	if (typeof raw === "string") {
 		const parsed = moment(raw, ["YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD"], true);
 		return parsed.isValid() ? parsed : null;
@@ -103,7 +103,7 @@ export function parseDatetime(raw: unknown): moment.Moment | null {
 // site — it's a parameter (not a hardcoded moment() inside) purely so tests
 // can pin it to a fixed instant instead of depending on whatever day the
 // test happens to run on.
-export function dateGroupLabel(date: moment.Moment, now: moment.Moment = moment()): string {
+export function dateGroupLabel(date: Moment, now: Moment = moment()): string {
 	const today = now.clone().startOf("day");
 	if (date.isSameOrAfter(today, "day")) return "Today";
 	if (date.isSame(today.clone().subtract(1, "day"), "day")) return "Yesterday";
@@ -206,7 +206,7 @@ export class NotesListView extends ItemView {
 		});
 	}
 
-	private resolveDate(file: TFile, cache: CachedMetadata | null): moment.Moment {
+	private resolveDate(file: TFile, cache: CachedMetadata | null): Moment {
 		const fm = cache?.frontmatter;
 
 		const timestamp = fm?.timestamp ? parseDatetime(fm.timestamp) : null;

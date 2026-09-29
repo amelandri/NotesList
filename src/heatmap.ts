@@ -1,4 +1,4 @@
-import { moment } from "obsidian";
+import { Moment, moment } from "./moment";
 
 const WEEKDAYS = 7;
 const RANGE_MONTHS = 6;
@@ -12,7 +12,7 @@ export interface HeatmapSelection {
 
 export function renderHeatmap(
 	container: HTMLElement,
-	dates: moment.Moment[],
+	dates: Moment[],
 	visibleCount: number,
 	selection: HeatmapSelection
 ): void {
@@ -97,7 +97,7 @@ export function levelFor(count: number, maxCount: number): number {
 // outside the heatmap's own 6-month window a date falls — computeVisibleMaxCount
 // below is what restricts the *color scale* to the visible range; this just
 // buckets every note's date, unfiltered.
-export function countByDay(dates: moment.Moment[]): Map<string, number> {
+export function countByDay(dates: Moment[]): Map<string, number> {
 	const dayCounts = new Map<string, number>();
 	for (const date of dates) {
 		const key = date.format("YYYY-MM-DD");
@@ -111,7 +111,7 @@ export function countByDay(dates: moment.Moment[]): Map<string, number> {
 // (e.g. a bulk import from a year ago) would otherwise dominate the result
 // and flatten every visible cell's contrast down near "Less" even on the
 // grid's own busiest day.
-export function computeVisibleMaxCount(dayCounts: Map<string, number>, start: moment.Moment, end: moment.Moment): number {
+export function computeVisibleMaxCount(dayCounts: Map<string, number>, start: Moment, end: Moment): number {
 	let maxCount = 0;
 	for (const cursor = start.clone(); cursor.isSameOrBefore(end, "day"); cursor.add(1, "day")) {
 		const count = dayCounts.get(cursor.format("YYYY-MM-DD")) ?? 0;

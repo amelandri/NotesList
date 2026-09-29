@@ -8,7 +8,6 @@ import {
 	TFile,
 	WorkspaceLeaf,
 	debounce,
-	moment,
 	normalizePath,
 } from "obsidian";
 import {
@@ -19,6 +18,7 @@ import {
 	ShowNoteNameMode,
 	migrateSettings,
 } from "./settings";
+import { moment } from "./moment";
 import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
 
 // Obsidian's own path normalizer handles slashes, leading/trailing junk, and
