@@ -1,5 +1,7 @@
 export type ShowNoteNameMode = "never" | "always" | "whenDifferent";
 export type ContentDisplayMode = "full" | "preview";
+/** How deep the sidebar's tag tree is expanded by default: "1" = fully collapsed (only top-level tags shown), "2"/"3" = expanded down to that level, "all" = fully expanded. */
+export type TagTreeExpandLevel = "1" | "2" | "3" | "all";
 
 export interface NotesListSettings {
 	/** Bumped by migrateSettings() whenever this shape changes — see SETTINGS_MIGRATIONS below. */
@@ -22,6 +24,8 @@ export interface NotesListSettings {
 	uniqueNoteNameFormat: string;
 	/** Vault-relative path to a note used as a template for new notes (New Note button). Empty = no template, a blank note. The template's frontmatter must contain a "timestamp" property. */
 	templatePath: string;
+	/** Default expansion of the sidebar's tag tree — see TagTreeExpandLevel. The user can still expand/collapse individual tags by hand. */
+	tagTreeExpandLevel: TagTreeExpandLevel;
 }
 
 /** Fallback used whenever uniqueNoteNameFormat is blank — also this plugin's out-of-the-box default, matching the pattern Obsidian's own "Unique note creator" core plugin used to generate (this plugin no longer depends on or reads from it). */
@@ -79,4 +83,5 @@ export const DEFAULT_SETTINGS: NotesListSettings = {
 	showDateGroups: false,
 	uniqueNoteNameFormat: DEFAULT_UNIQUE_NOTE_NAME_FORMAT,
 	templatePath: "",
+	tagTreeExpandLevel: "all",
 };

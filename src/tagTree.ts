@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import type { TagTreeExpandLevel } from "./settings";
 
 export interface TagTreeNode {
 	segment: string;
@@ -71,13 +72,22 @@ export function buildTagTree(perNoteTags: string[][]): TagTreeNode {
 	return root;
 }
 
+// Whether a node at `depth` (1 = a top-level tag) starts out collapsed under
+// the "Tag tree expansion" setting: a node is expanded only while it's above
+// the chosen level, so level 1 collapses every top-level tag, level 2 shows
+// the top-level tags open with their children collapsed, and so on. Only
+// matters for nodes that have children — a leaf has nothing to collapse.
+export function isCollapsedByDefault(depth: number, level: TagTreeExpandLevel): boolean {
+	return level !== "all" && depth >= Number(level);
+}
+
 export function renderTagTree(
 	container: HTMLElement,
 	root: TagTreeNode,
 	selectedPath: string | null,
-	collapsedPaths: ReadonlySet<string>,
+	isCollapsed: (path: string, depth: number) => boolean,
 	onSelect: (path: string) => void,
-	onToggleCollapse: (path: string) => void
+	onSetCollapsed: (path: string, collapsed: boolean) => void
 ): void {
 	container.empty();
 
@@ -86,16 +96,17 @@ export function renderTagTree(
 		return;
 	}
 
-	renderChildren(container, root, selectedPath, collapsedPaths, onSelect, onToggleCollapse);
+	renderChildren(container, root, 1, selectedPath, isCollapsed, onSelect, onSetCollapsed);
 }
 
 function renderChildren(
 	container: HTMLElement,
 	node: TagTreeNode,
+	depth: number,
 	selectedPath: string | null,
-	collapsedPaths: ReadonlySet<string>,
+	isCollapsed: (path: string, depth: number) => boolean,
 	onSelect: (path: string) => void,
-	onToggleCollapse: (path: string) => void
+	onSetCollapsed: (path: string, collapsed: boolean) => void
 ): void {
 	const children = Array.from(node.children.values()).sort((a, b) =>
 		a.segment.localeCompare(b.segment, undefined, { sensitivity: "base" })
@@ -104,10 +115,10 @@ function renderChildren(
 	const list = container.createEl("ul", { cls: "notes-tag-tree-list" });
 	for (const child of children) {
 		const hasChildren = child.children.size > 0;
-		const isCollapsed = hasChildren && collapsedPaths.has(child.path);
+		const collapsed = hasChildren && isCollapsed(child.path, depth);
 
 		const item = list.createEl("li", {
-			cls: "notes-tag-tree-item" + (isCollapsed ? " is-collapsed" : ""),
+			cls: "notes-tag-tree-item" + (collapsed ? " is-collapsed" : ""),
 		});
 
 		const row = item.createDiv({ cls: "notes-tag-tree-row" });
@@ -115,7 +126,7 @@ function renderChildren(
 		const toggle = row.createSpan({ cls: "notes-tag-tree-toggle" });
 		if (hasChildren) {
 			setIcon(toggle, "chevron-down");
-			toggle.addEventListener("click", () => onToggleCollapse(child.path));
+			toggle.addEventListener("click", () => onSetCollapsed(child.path, !collapsed));
 		}
 
 		const label = row.createSpan({
@@ -126,7 +137,7 @@ function renderChildren(
 		label.addEventListener("click", () => onSelect(child.path));
 
 		if (hasChildren) {
-			renderChildren(item, child, selectedPath, collapsedPaths, onSelect, onToggleCollapse);
+			renderChildren(item, child, depth + 1, selectedPath, isCollapsed, onSelect, onSetCollapsed);
 		}
 	}
 }

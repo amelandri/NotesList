@@ -16,6 +16,7 @@ import {
 	DEFAULT_UNIQUE_NOTE_NAME_FORMAT,
 	NotesListSettings,
 	ShowNoteNameMode,
+	TagTreeExpandLevel,
 	migrateSettings,
 } from "./settings";
 import { moment } from "./moment";
@@ -349,7 +350,7 @@ class NotesListSettingTab extends PluginSettingTab {
 			},
 			{
 				type: "group",
-				heading: "Notes display",
+				heading: "Notes list",
 				items: [
 					{
 						name: "Show note name",
@@ -400,6 +401,27 @@ class NotesListSettingTab extends PluginSettingTab {
 							min: 1,
 							step: 1,
 							validate: validatePositiveInteger,
+						},
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Sidebar",
+				items: [
+					{
+						name: "Tag tree expansion",
+						desc: "How far the tag tree is expanded when it's shown. You can still expand or collapse any tag by hand.",
+						control: {
+							type: "dropdown",
+							key: "tagTreeExpandLevel",
+							defaultValue: DEFAULT_SETTINGS.tagTreeExpandLevel,
+							options: {
+								"1": "Fully collapsed",
+								"2": "Expand to level 2",
+								"3": "Expand to level 3",
+								all: "Fully expanded",
+							} satisfies Record<TagTreeExpandLevel, string>,
 						},
 					},
 				],

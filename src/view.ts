@@ -11,9 +11,9 @@ import {
 	setIcon,
 } from "obsidian";
 import type NotesListPlugin from "./main";
-import type { ContentDisplayMode } from "./settings";
+import type { ContentDisplayMode, TagTreeExpandLevel } from "./settings";
 import { renderHeatmap, type HeatmapSelection } from "./heatmap";
-import { buildTagTree, renderTagTree, tagMatchesFilter } from "./tagTree";
+import { buildTagTree, isCollapsedByDefault, renderTagTree, tagMatchesFilter } from "./tagTree";
 import { Moment, moment } from "./moment";
 
 export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
@@ -192,7 +192,12 @@ export class NotesListView extends ItemView {
 	private selectedTag: string | null = null;
 	private selectedDate: string | null = null;
 	private selectedMonth: string | null = null;
-	private collapsedTagPaths = new Set<string>();
+	// Tags the user has expanded/collapsed by hand (path -> collapsed),
+	// overriding the "Tag tree expansion" setting's default for that one node.
+	// Cleared whenever that setting changes (see render()), so a new default
+	// shows up immediately instead of being masked by earlier clicks.
+	private tagCollapseOverrides = new Map<string, boolean>();
+	private appliedTagTreeExpandLevel: TagTreeExpandLevel | null = null;
 	private currentPage = 1;
 	// Populated by rebuildEntries() — the expensive per-note scan (metadata
 	// lookup, date resolution, tag extraction). Reused across render()s that
@@ -478,20 +483,23 @@ export class NotesListView extends ItemView {
 		const tagPanel = heatmapPanel.createDiv({ cls: "notes-tag-tree-panel" });
 		tagPanel.createEl("h4", { text: "Tags", cls: "notes-list-panel-title" });
 		const tagTree = buildTagTree(allEntries.map((e) => e.tags));
+		const expandLevel = this.plugin.settings.tagTreeExpandLevel;
+		if (expandLevel !== this.appliedTagTreeExpandLevel) {
+			this.tagCollapseOverrides.clear();
+			this.appliedTagTreeExpandLevel = expandLevel;
+		}
 		renderTagTree(
 			tagPanel.createDiv({ cls: "notes-tag-tree" }),
 			tagTree,
 			this.selectedTag,
-			this.collapsedTagPaths,
+			(path, depth) => this.tagCollapseOverrides.get(path) ?? isCollapsedByDefault(depth, expandLevel),
 			(path) => {
 				this.selectedTag = path;
 				this.currentPage = 1;
 				void this.render();
 			},
-			(path) => {
-				if (!this.collapsedTagPaths.delete(path)) {
-					this.collapsedTagPaths.add(path);
-				}
+			(path, collapsed) => {
+				this.tagCollapseOverrides.set(path, collapsed);
 				void this.render();
 			}
 		);

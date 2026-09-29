@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTagTree, tagMatchesFilter } from "../src/tagTree";
+import { buildTagTree, isCollapsedByDefault, tagMatchesFilter } from "../src/tagTree";
 
 describe("tagMatchesFilter", () => {
 	it("matches an exact tag case-insensitively", () => {
@@ -65,5 +65,28 @@ describe("buildTagTree", () => {
 	it("counts a single note only once even if it carries the same tag under two different casings", () => {
 		const root = buildTagTree([["#Project", "#project"]]);
 		expect(root.children.get("project")?.count).toBe(1);
+	});
+});
+
+describe("isCollapsedByDefault", () => {
+	it("level 1 collapses every node, starting with the top-level tags", () => {
+		expect(isCollapsedByDefault(1, "1")).toBe(true);
+		expect(isCollapsedByDefault(2, "1")).toBe(true);
+	});
+
+	it("level 2 keeps top-level tags open and collapses their children", () => {
+		expect(isCollapsedByDefault(1, "2")).toBe(false);
+		expect(isCollapsedByDefault(2, "2")).toBe(true);
+		expect(isCollapsedByDefault(3, "2")).toBe(true);
+	});
+
+	it("level 3 keeps the first two levels open", () => {
+		expect(isCollapsedByDefault(1, "3")).toBe(false);
+		expect(isCollapsedByDefault(2, "3")).toBe(false);
+		expect(isCollapsedByDefault(3, "3")).toBe(true);
+	});
+
+	it('"all" never collapses anything, however deep', () => {
+		for (const depth of [1, 2, 3, 10]) expect(isCollapsedByDefault(depth, "all")).toBe(false);
 	});
 });
