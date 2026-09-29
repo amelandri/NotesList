@@ -17,7 +17,7 @@ import { buildTagTree, renderTagTree, tagMatchesFilter } from "./tagTree";
 
 export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
 
-function isUniqueNoteName(basename: string, format: string): boolean {
+export function isUniqueNoteName(basename: string, format: string): boolean {
 	return moment(basename, format, true).isValid();
 }
 
@@ -47,8 +47,64 @@ interface NoteEntry {
 // the opening line. Matching zero whole lines lets the closing delimiter be
 // found immediately in that case instead of the regex failing outright and
 // leaving both "---" lines to render as a stray bullet.
-function stripFrontmatter(raw: string): string {
+export function stripFrontmatter(raw: string): string {
 	return raw.replace(/^---\r?\n(?:.*\r?\n)*?---[ \t]*(?:\r?\n|$)/, "");
+}
+
+// Doesn't depend on any view/plugin state — a free function (not a method)
+// so it can be unit-tested directly, and reused as-is from resolveDate()
+// below.
+//
+// The normal case is a quoted string written by Obsidian's own "Date & time"
+// (or plain "Date") property picker — always local wall-clock time, e.g.
+// "2026-09-25T16:20:00" (or "2026-09-25" with no time at all) — parsed
+// directly against those formats, with no conversion needed.
+//
+// An unquoted value typed by hand bypasses that: YAML 1.1's timestamp
+// resolver auto-casts it to a native Date instead, always at exactly UTC
+// midnight when the source text carried no time-of-day at all
+// (Date.UTC(year, month, day) — hour/minute/second default to 0 with no
+// exceptions), and to a real, non-midnight UTC time when it did. Checking
+// the *UTC* time-of-day, not the local one, is what reliably tells those
+// two cases apart: a date-only value's *local* representation is shifted
+// away from midnight by whatever the runtime's UTC offset happens to be —
+// exactly the artifact this needs to see past, not react to. (A genuinely
+// embedded time is still off by that same offset, since the resolver has
+// no notion of "local time" and always treats it as UTC — an unavoidable
+// quirk of typing it unquoted; quoting the value sidesteps it entirely,
+// which is what Obsidian's own property picker always does.)
+export function parseDatetime(raw: unknown): moment.Moment | null {
+	if (typeof raw === "string") {
+		const parsed = moment(raw, ["YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD"], true);
+		return parsed.isValid() ? parsed : null;
+	}
+
+	// Anything else is trusted to be a native Date (or another moment()-
+	// compatible shape) — the only other thing YAML's timestamp resolver
+	// ever hands back for an unquoted value, per the comment above.
+	const date = moment(raw as moment.MomentInput);
+	if (!date.isValid()) return null;
+	if (date.clone().utc().format("HH:mm:ss") === "00:00:00") {
+		date.startOf("day");
+	}
+	return date;
+}
+
+// "Today" also catches a future-dated note (isSameOrAfter, not isSame) —
+// none of the four labels the setting offers fit a note dated ahead of
+// today, and folding it into "Today" avoids inventing a fifth one.
+// weekStart uses moment's own locale-aware start of week, same as the
+// heatmap's own week bucketing in heatmap.ts, so both agree on where a week
+// begins. `now` defaults to the real current time for every production call
+// site — it's a parameter (not a hardcoded moment() inside) purely so tests
+// can pin it to a fixed instant instead of depending on whatever day the
+// test happens to run on.
+export function dateGroupLabel(date: moment.Moment, now: moment.Moment = moment()): string {
+	const today = now.clone().startOf("day");
+	if (date.isSameOrAfter(today, "day")) return "Today";
+	if (date.isSame(today.clone().subtract(1, "day"), "day")) return "Yesterday";
+	if (date.isSameOrAfter(today.clone().startOf("week"), "day")) return "This week";
+	return "Older";
 }
 
 // "readableLineLength" is an undocumented internal Vault config key with no public
@@ -138,7 +194,7 @@ export class NotesListView extends ItemView {
 	private resolveDate(file: TFile, cache: CachedMetadata | null): moment.Moment {
 		const fm = cache?.frontmatter;
 
-		const timestamp = fm?.timestamp ? this.parseDatetime(fm.timestamp) : null;
+		const timestamp = fm?.timestamp ? parseDatetime(fm.timestamp) : null;
 		if (timestamp?.isValid()) return timestamp;
 
 		// Legacy fallback for notes written before "timestamp" replaced the old,
@@ -146,45 +202,10 @@ export class NotesListView extends ItemView {
 		// date (never with a time-of-day) — "time" itself is no longer read at
 		// all. parseDatetime() already resolves a date-only value to local
 		// midnight on its own (see below), so there's nothing extra to do here.
-		const date = fm?.date ? this.parseDatetime(fm.date) : null;
+		const date = fm?.date ? parseDatetime(fm.date) : null;
 		if (date?.isValid()) return date;
 
 		return moment(file.stat.mtime);
-	}
-
-	// The normal case is a quoted string written by Obsidian's own "Date & time"
-	// (or plain "Date") property picker — always local wall-clock time, e.g.
-	// "2026-09-25T16:20:00" (or "2026-09-25" with no time at all) — parsed
-	// directly against those formats, with no conversion needed.
-	//
-	// An unquoted value typed by hand bypasses that: YAML 1.1's timestamp
-	// resolver auto-casts it to a native Date instead, always at exactly UTC
-	// midnight when the source text carried no time-of-day at all
-	// (Date.UTC(year, month, day) — hour/minute/second default to 0 with no
-	// exceptions), and to a real, non-midnight UTC time when it did. Checking
-	// the *UTC* time-of-day, not the local one, is what reliably tells those
-	// two cases apart: a date-only value's *local* representation is shifted
-	// away from midnight by whatever the runtime's UTC offset happens to be —
-	// exactly the artifact this needs to see past, not react to. (A genuinely
-	// embedded time is still off by that same offset, since the resolver has
-	// no notion of "local time" and always treats it as UTC — an unavoidable
-	// quirk of typing it unquoted; quoting the value sidesteps it entirely,
-	// which is what Obsidian's own property picker always does.)
-	private parseDatetime(raw: unknown): moment.Moment | null {
-		if (typeof raw === "string") {
-			const parsed = moment(raw, ["YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD"], true);
-			return parsed.isValid() ? parsed : null;
-		}
-
-		// Anything else is trusted to be a native Date (or another moment()-
-		// compatible shape) — the only other thing YAML's timestamp resolver
-		// ever hands back for an unquoted value, per the comment above.
-		const date = moment(raw as moment.MomentInput);
-		if (!date.isValid()) return null;
-		if (date.clone().utc().format("HH:mm:ss") === "00:00:00") {
-			date.startOf("day");
-		}
-		return date;
 	}
 
 	// Full data reload: re-scans every note in scope (metadata, date, tags) —
@@ -286,7 +307,7 @@ export class NotesListView extends ItemView {
 			let lastGroup: string | null = null;
 			for (const entry of pageEntries) {
 				if (this.plugin.settings.showDateGroups && !entry.pinned) {
-					const group = this.dateGroupLabel(entry.date);
+					const group = dateGroupLabel(entry.date);
 					if (group !== lastGroup) {
 						mainEl.createDiv({ cls: "notes-list-date-group-header", text: group });
 						lastGroup = group;
@@ -388,20 +409,6 @@ export class NotesListView extends ItemView {
 				void this.render();
 			}
 		);
-	}
-
-	// "Today" also catches a future-dated note (isSameOrAfter, not isSame) —
-	// none of the four labels the setting offers fit a note dated ahead of
-	// today, and folding it into "Today" avoids inventing a fifth one.
-	// weekStart uses moment's own locale-aware start of week, same as the
-	// heatmap's own week bucketing in heatmap.ts, so both agree on where a
-	// week begins.
-	private dateGroupLabel(date: moment.Moment): string {
-		const today = moment().startOf("day");
-		if (date.isSameOrAfter(today, "day")) return "Today";
-		if (date.isSame(today.clone().subtract(1, "day"), "day")) return "Yesterday";
-		if (date.isSameOrAfter(today.clone().startOf("week"), "day")) return "This week";
-		return "Older";
 	}
 
 	private buildEmptyMessage(): string {

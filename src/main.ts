@@ -30,7 +30,7 @@ import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
 // sentinel both folderPath (entire vault) and templatePath (no template) rely
 // on, so that case is special-cased ahead of it rather than trusted to
 // round-trip through normalizePath as-is. Shared by both settings below.
-function normalizeOptionalPath(path: string): string {
+export function normalizeOptionalPath(path: string): string {
 	return path.trim() === "" ? "" : normalizePath(path);
 }
 
@@ -40,8 +40,16 @@ function normalizeOptionalPath(path: string): string {
 // (moment.js format tokens don't use it, but plain text in the format string
 // passes through verbatim), which would silently create the note in a
 // subfolder instead of failing loudly.
-function sanitizeFilenameSegment(name: string): string {
+export function sanitizeFilenameSegment(name: string): string {
 	return name.replace(/[\\/:*?"<>|]/g, "-").trim() || "note";
+}
+
+// Falls back to DEFAULT_UNIQUE_NOTE_NAME_FORMAT whenever the configured
+// value is blank, rather than persisting that fallback into the setting
+// itself. A free function (not a method) so it's directly testable without
+// a plugin instance.
+export function resolveUniqueNoteNameFormat(configured: string): string {
+	return configured.trim() || DEFAULT_UNIQUE_NOTE_NAME_FORMAT;
 }
 
 // "metadataTypeManager" is an undocumented internal surface with no public
@@ -162,12 +170,12 @@ export default class NotesListPlugin extends Plugin {
 		});
 	}
 
-	// Falls back to DEFAULT_UNIQUE_NOTE_NAME_FORMAT whenever the setting is
-	// blank, rather than persisting that fallback into the setting itself —
-	// used identically here and by NotesListView's "whenDifferent" detection,
-	// so the two always agree on what counts as an auto-generated name.
+	// Used identically here and by NotesListView's "whenDifferent" detection,
+	// so the two always agree on what counts as an auto-generated name — see
+	// resolveUniqueNoteNameFormat() for the (pure, directly testable) fallback
+	// logic itself.
 	uniqueNoteNameFormat(): string {
-		return this.settings.uniqueNoteNameFormat.trim() || DEFAULT_UNIQUE_NOTE_NAME_FORMAT;
+		return resolveUniqueNoteNameFormat(this.settings.uniqueNoteNameFormat);
 	}
 
 	private notePath(folderPath: string, basename: string): string {

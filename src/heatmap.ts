@@ -18,24 +18,12 @@ export function renderHeatmap(
 ): void {
 	const { selectedDate, onSelectDate, selectedMonth, onSelectMonth } = selection;
 
-	const dayCounts = new Map<string, number>();
-	for (const date of dates) {
-		const key = date.format("YYYY-MM-DD");
-		dayCounts.set(key, (dayCounts.get(key) ?? 0) + 1);
-	}
+	const dayCounts = countByDay(dates);
 
 	const today = moment().startOf("day");
 	const start = today.clone().subtract(RANGE_MONTHS, "months").startOf("week");
 
-	// Scaled from only the days actually drawn below (start..today), not every
-	// dayCounts entry — dates outside that window (e.g. a bulk import from a
-	// year ago) would otherwise dominate maxCount and flatten every visible
-	// cell's contrast down near "Less" even on the grid's own busiest day.
-	let maxCount = 0;
-	for (const cursor = start.clone(); cursor.isSameOrBefore(today, "day"); cursor.add(1, "day")) {
-		const count = dayCounts.get(cursor.format("YYYY-MM-DD")) ?? 0;
-		if (count > maxCount) maxCount = count;
-	}
+	const maxCount = computeVisibleMaxCount(dayCounts, start, today);
 
 	container.empty();
 	container.addClass("notes-heatmap");
@@ -96,11 +84,38 @@ export function renderHeatmap(
 	});
 }
 
-function levelFor(count: number, maxCount: number): number {
+export function levelFor(count: number, maxCount: number): number {
 	if (count === 0 || maxCount === 0) return 0;
 	const ratio = count / maxCount;
 	if (ratio > 0.75) return 4;
 	if (ratio > 0.5) return 3;
 	if (ratio > 0.25) return 2;
 	return 1;
+}
+
+// One entry per distinct "YYYY-MM-DD" among `dates`, regardless of how far
+// outside the heatmap's own 6-month window a date falls — computeVisibleMaxCount
+// below is what restricts the *color scale* to the visible range; this just
+// buckets every note's date, unfiltered.
+export function countByDay(dates: moment.Moment[]): Map<string, number> {
+	const dayCounts = new Map<string, number>();
+	for (const date of dates) {
+		const key = date.format("YYYY-MM-DD");
+		dayCounts.set(key, (dayCounts.get(key) ?? 0) + 1);
+	}
+	return dayCounts;
+}
+
+// Scaled from only the days actually drawn in the heatmap (start..end,
+// inclusive of both), not every dayCounts entry — a date outside that window
+// (e.g. a bulk import from a year ago) would otherwise dominate the result
+// and flatten every visible cell's contrast down near "Less" even on the
+// grid's own busiest day.
+export function computeVisibleMaxCount(dayCounts: Map<string, number>, start: moment.Moment, end: moment.Moment): number {
+	let maxCount = 0;
+	for (const cursor = start.clone(); cursor.isSameOrBefore(end, "day"); cursor.add(1, "day")) {
+		const count = dayCounts.get(cursor.format("YYYY-MM-DD")) ?? 0;
+		if (count > maxCount) maxCount = count;
+	}
+	return maxCount;
 }
