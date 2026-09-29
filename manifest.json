@@ -1,7 +1,7 @@
 {
 	"id": "notes-list",
 	"name": "Notes List",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"minAppVersion": "1.11.0",
 	"description": "Show notes from a folder as a chronological list with an activity heatmap, tag browser, pinning, and date filters.",
 	"author": "Alessandro Melandri",
