@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-29
+
 ### Fixed
 
 - The view is now usable on phones and in narrow panes: below 720 px of width it switches to a single column with search, heatmap, active filters, tags and then the notes list. In this layout the Tags section is collapsible, collapsed by default, and folds back after a tag is selected, and the heatmap stretches to the full width.
@@ -86,7 +88,8 @@ Initial release.
 - Double-clicking a note's content opens the note.
 - The notes column follows Obsidian's "Readable line length" setting.
 
-[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/amelandri/NotesList/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/amelandri/NotesList/compare/0.1.6...0.2.0
 [0.1.6]: https://github.com/amelandri/NotesList/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/amelandri/NotesList/compare/0.1.4...0.1.5
