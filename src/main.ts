@@ -93,7 +93,7 @@ export default class NotesListPlugin extends Plugin {
 
 		this.registerView(VIEW_TYPE_NOTES_LIST, (leaf) => new NotesListView(leaf, this));
 
-		this.addRibbonIcon("list-ordered", "Open Notes List", () => {
+		this.addRibbonIcon("list-ordered", "Open notes list", () => {
 			void this.activateView();
 		});
 

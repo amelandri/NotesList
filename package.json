@@ -5,7 +5,8 @@
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"build": "tsc -noEmit -skipLibCheck && eslint . --max-warnings 0 && node esbuild.config.mjs production",
+		"lint": "eslint . --max-warnings 0",
 		"install-to-vault": "node copy-to-vault.mjs",
 		"deploy": "npm run build && npm run install-to-vault",
 		"generate-test-notes": "node generate-test-notes.mjs",
@@ -16,12 +17,15 @@
 	"author": "",
 	"license": "MIT",
 	"devDependencies": {
+		"@eslint/js": "^9.39.5",
 		"@types/node": "^20.11.5",
 		"esbuild": "^0.20.0",
-		"moment": "2.29.4",
+		"eslint": "^9.39.5",
+		"eslint-plugin-obsidianmd": "^0.4.2",
 		"obsidian": "^1.13.1",
 		"tslib": "2.6.2",
 		"typescript": "^5.3.3",
+		"typescript-eslint": "^8.71.0",
 		"vitest": "^1.6.1"
 	}
 }

@@ -19,9 +19,16 @@ Notes List turns a vault folder into a browsable timeline: a chronological list 
 
 ## Installation
 
-Submitted to the Community Plugins directory and currently awaiting review.
+Notes List is available in the official Obsidian Community Plugins directory: [community.obsidian.md/plugins/notes-list](https://community.obsidian.md/plugins/notes-list).
 
-Until it's approved, install manually from source:
+To install it from Obsidian:
+
+1. Open **Settings → Community plugins** and turn off Restricted mode if it's on.
+2. Click **Browse**, search for "Notes List", then click **Install** and **Enable**.
+
+### Building from source
+
+To build it yourself instead:
 
 ```bash
 npm install

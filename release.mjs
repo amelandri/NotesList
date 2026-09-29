@@ -11,7 +11,16 @@
 //                    you want something more specific.
 //
 // Must be run from "dev", with a clean working tree, up to date with
-// "origin/dev". Every commit/tag/push this script makes uses your own git
+// "origin/dev".
+//
+// Safe to re-run with the same version after a failure partway through
+// (e.g. a transient "remote rejected ... (failed)" from GitHub on a push):
+// if the version bump commit and/or tag already exist, the script verifies
+// they're the ones it would have made (tag on HEAD, HEAD being the "Bump
+// version to x.y.z" commit) and skips straight to the remaining steps. Every
+// later step is idempotent too — pushes are no-ops when already done, and an
+// existing GitHub release for the tag is reused, with its assets replaced by
+// the freshly built ones. Every commit/tag/push this script makes uses your own git
 // identity (whatever "git config user.name/user.email" already is) and your
 // own stored GitHub credential (the same one "git push" already uses) — none
 // of it runs or is attributed as Claude. "main" is only ever fast-forwarded
@@ -38,6 +47,25 @@ function capture(cmd, opts = {}) {
 function run(cmd) {
 	console.log(`$ ${cmd}`);
 	execSync(cmd, { stdio: "inherit" });
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// GitHub occasionally rejects a perfectly valid push with a bare
+// "! [remote rejected] <ref> (failed)" and no reason; retrying the very same
+// push a few seconds later goes through. Only used for pushes, which are
+// idempotent.
+async function runWithRetry(cmd, attempts = 3, delayMs = 5000) {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			run(cmd);
+			return;
+		} catch (err) {
+			if (attempt >= attempts) throw err;
+			console.warn(`Attempt ${attempt}/${attempts} failed, retrying in ${delayMs / 1000}s...`);
+			await sleep(delayMs);
+		}
+	}
 }
 
 function fail(message) {
@@ -83,18 +111,36 @@ function parseOwnerRepo(remoteUrl) {
 	return [match[1], match[2]];
 }
 
+function githubHeaders(token, extra = {}) {
+	return { Authorization: `token ${token}`, Accept: "application/vnd.github+json", ...extra };
+}
+
+// null when no release exists for the tag yet (404).
+async function findRelease(owner, repo, token, tagName) {
+	const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tagName)}`, {
+		headers: githubHeaders(token),
+	});
+	if (res.status === 404) return null;
+	if (!res.ok) fail(`looking up the GitHub release for ${tagName} failed (${res.status}): ${await res.text()}`);
+	return res.json();
+}
+
 async function createRelease(owner, repo, token, tagName, notes) {
 	const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases`, {
 		method: "POST",
-		headers: {
-			Authorization: `token ${token}`,
-			Accept: "application/vnd.github+json",
-			"Content-Type": "application/json",
-		},
+		headers: githubHeaders(token, { "Content-Type": "application/json" }),
 		body: JSON.stringify({ tag_name: tagName, name: tagName, body: notes, draft: false, prerelease: false }),
 	});
 	if (!res.ok) fail(`GitHub release creation failed (${res.status}): ${await res.text()}`);
 	return res.json();
+}
+
+async function deleteAsset(owner, repo, token, assetId) {
+	const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/assets/${assetId}`, {
+		method: "DELETE",
+		headers: githubHeaders(token),
+	});
+	if (!res.ok && res.status !== 404) fail(`deleting release asset ${assetId} failed (${res.status}): ${await res.text()}`);
 }
 
 async function uploadAsset(uploadUrlTemplate, token, filePath, contentType) {
@@ -102,11 +148,7 @@ async function uploadAsset(uploadUrlTemplate, token, filePath, contentType) {
 	const url = uploadUrlTemplate.replace("{?name,label}", `?name=${encodeURIComponent(name)}`);
 	const res = await fetch(url, {
 		method: "POST",
-		headers: {
-			Authorization: `token ${token}`,
-			Accept: "application/vnd.github+json",
-			"Content-Type": contentType,
-		},
+		headers: githubHeaders(token, { "Content-Type": contentType }),
 		body: readFileSync(filePath),
 	});
 	if (!res.ok) fail(`Uploading ${name} failed (${res.status}): ${await res.text()}`);
@@ -138,59 +180,90 @@ run("git fetch origin");
 const behindCount = capture("git rev-list --count dev..origin/dev");
 if (behindCount !== "0") fail(`"dev" is behind "origin/dev" by ${behindCount} commit(s) — pull first.`);
 
-const localTags = capture("git tag -l").split("\n").filter(Boolean);
-if (localTags.includes(version)) fail(`tag "${version}" already exists locally.`);
+// Also fetches tags, so a tag pushed by an earlier, interrupted run is
+// visible locally even from a fresh clone.
+run("git fetch origin --tags");
 
-const remoteTagLines = capture("git ls-remote --tags origin").split("\n").filter(Boolean);
-if (remoteTagLines.some((line) => line.endsWith(`refs/tags/${version}`))) {
-	fail(`tag "${version}" already exists on origin.`);
+function tagCommit(tag) {
+	try {
+		return capture(`git rev-parse --verify --quiet "refs/tags/${tag}^{commit}"`);
+	} catch {
+		return null;
+	}
 }
 
+const head = capture("git rev-parse HEAD");
+const bumpSubject = `Bump version to ${version}`;
+const headIsBump = capture("git log -1 --format=%s") === bumpSubject;
+const existingTagCommit = tagCommit(version);
 const manifest = readJson(MANIFEST_PATH);
-if (manifest.version === version) fail(`manifest.json is already at version ${version}.`);
-if (!isGreaterSemver(version, manifest.version)) {
-	fail(`${version} is not greater than the current manifest.json version (${manifest.version}).`);
+
+if (existingTagCommit && existingTagCommit !== head) {
+	fail(`tag "${version}" already exists but points at ${existingTagCommit}, not HEAD (${head}). Delete or move it by hand if that's intended.`);
 }
-
-const previousVersion = manifest.version;
-console.log(`\nReleasing ${previousVersion} -> ${version}\n`);
-
-// --- 3. Bump the version everywhere ---
-
-const minAppVersion = manifest.minAppVersion;
-manifest.version = version;
-writeJson(MANIFEST_PATH, manifest);
-
-const pkg = readJson(PACKAGE_PATH);
-pkg.version = version;
-writeJson(PACKAGE_PATH, pkg);
+// Resuming: the bump commit (and possibly the tag) was already made by an
+// earlier run that failed at a later step.
+const resuming = Boolean(existingTagCommit) || (headIsBump && manifest.version === version);
+if (resuming && !(headIsBump && manifest.version === version)) {
+	fail(`tag "${version}" is on HEAD, but HEAD isn't the "${bumpSubject}" commit with manifest.json at ${version}.`);
+}
 
 const versions = readJson(VERSIONS_PATH);
-versions[version] = minAppVersion;
-writeJson(VERSIONS_PATH, versions);
+let previousVersion;
+
+if (resuming) {
+	previousVersion = Object.keys(versions)
+		.filter((v) => /^\d+\.\d+\.\d+$/.test(v) && isGreaterSemver(version, v))
+		.sort((x, y) => (isGreaterSemver(x, y) ? -1 : 1))[0];
+	console.log(`\nResuming release ${version} (bump commit${existingTagCommit ? " and tag" : ""} already made)\n`);
+} else {
+	if (manifest.version === version) fail(`manifest.json is already at version ${version}, but HEAD isn't its "${bumpSubject}" commit.`);
+	if (!isGreaterSemver(version, manifest.version)) {
+		fail(`${version} is not greater than the current manifest.json version (${manifest.version}).`);
+	}
+	previousVersion = manifest.version;
+	console.log(`\nReleasing ${previousVersion} -> ${version}\n`);
+
+	// --- 3. Bump the version everywhere ---
+
+	manifest.version = version;
+	writeJson(MANIFEST_PATH, manifest);
+
+	const pkg = readJson(PACKAGE_PATH);
+	pkg.version = version;
+	writeJson(PACKAGE_PATH, pkg);
+
+	versions[version] = manifest.minAppVersion;
+	writeJson(VERSIONS_PATH, versions);
+}
 
 // --- 4. Build — verifies everything compiles and produces the release main.js ---
+// Always runs, resuming or not: main.js isn't committed, so the release
+// assets have to be built from this exact (tagged) commit either way.
 
 try {
 	run("npm run build");
 } catch {
-	run(`git checkout -- ${MANIFEST_PATH} ${PACKAGE_PATH} ${VERSIONS_PATH}`);
-	fail("build failed — version bump reverted, nothing committed.");
+	if (!resuming) run(`git checkout -- ${MANIFEST_PATH} ${PACKAGE_PATH} ${VERSIONS_PATH}`);
+	fail(resuming ? "build failed." : "build failed — version bump reverted, nothing committed.");
 }
 
 // --- 5. Commit, tag, push "dev" ---
 // No "Co-Authored-By" trailer: this commit is you, running your own release
 // script, not Claude.
 
-run(`git add ${MANIFEST_PATH} ${PACKAGE_PATH} ${VERSIONS_PATH}`);
-run(`git commit -m "Bump version to ${version}"`);
-run(`git tag -a ${version} -m "${version}"`);
-run("git push origin dev");
-run(`git push origin ${version}`);
+if (!resuming) {
+	run(`git add ${MANIFEST_PATH} ${PACKAGE_PATH} ${VERSIONS_PATH}`);
+	run(`git commit -m "${bumpSubject}"`);
+}
+if (!existingTagCommit) run(`git tag -a ${version} -m "${version}"`);
+// --atomic: "dev" and the tag land together or not at all, so a failure can't
+// leave one pushed without the other. Both are no-ops if already on origin.
+await runWithRetry(`git push --atomic origin dev refs/tags/${version}`);
 
 // --- 6. Fast-forward "main" to match "dev" (never force-pushed) ---
 
-run("git push origin dev:main");
+await runWithRetry("git push origin dev:main");
 try {
 	run("git fetch origin main:main");
 } catch {
@@ -203,10 +276,17 @@ const [owner, repo] = parseOwnerRepo(capture("git remote get-url origin"));
 const token = getGithubToken();
 const notes = notesArg || `Release ${version}.\n\nFull history: https://github.com/${owner}/${repo}/compare/${previousVersion}...${version}`;
 
-console.log("\nCreating GitHub release...");
-const release = await createRelease(owner, repo, token, version, notes);
+let release = await findRelease(owner, repo, token, version);
+if (release) {
+	console.log("\nGitHub release already exists — reusing it, replacing its assets.");
+} else {
+	console.log("\nCreating GitHub release...");
+	release = await createRelease(owner, repo, token, version, notes);
+}
 
 for (const [file, contentType] of RELEASE_ASSETS) {
+	const existing = (release.assets ?? []).find((asset) => asset.name === file);
+	if (existing) await deleteAsset(owner, repo, token, existing.id);
 	console.log(`Uploading ${file}...`);
 	await uploadAsset(release.upload_url, token, file, contentType);
 }
