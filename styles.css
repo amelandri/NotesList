@@ -180,7 +180,7 @@
 
 .notes-list-title {
 	font-weight: 600;
-	margin-bottom: var(--size-2-1);
+	margin-bottom: 0.4rem;
 }
 
 .notes-list-item-header {
