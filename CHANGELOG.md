@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-29
+
 ### Added
 
 - Full-text search: a search field at the top of the sidebar filters the list to notes whose name or body contains every search term. Search runs on submit (button or Enter), not while typing, and combines with the tag, day and month filters.
@@ -80,7 +82,8 @@ Initial release.
 - Double-clicking a note's content opens the note.
 - The notes column follows Obsidian's "Readable line length" setting.
 
-[Unreleased]: https://github.com/amelandri/NotesList/compare/0.1.6...HEAD
+[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/amelandri/NotesList/compare/0.1.6...0.2.0
 [0.1.6]: https://github.com/amelandri/NotesList/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/amelandri/NotesList/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/amelandri/NotesList/compare/0.1.3...0.1.4
