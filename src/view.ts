@@ -170,13 +170,16 @@ export class NotesListView extends ItemView {
 	// no notion of "local time" and always treats it as UTC — an unavoidable
 	// quirk of typing it unquoted; quoting the value sidesteps it entirely,
 	// which is what Obsidian's own property picker always does.)
-	private parseDatetime(raw: any): moment.Moment | null {
+	private parseDatetime(raw: unknown): moment.Moment | null {
 		if (typeof raw === "string") {
 			const parsed = moment(raw, ["YYYY-MM-DDTHH:mm:ss", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD"], true);
 			return parsed.isValid() ? parsed : null;
 		}
 
-		const date = moment(raw);
+		// Anything else is trusted to be a native Date (or another moment()-
+		// compatible shape) — the only other thing YAML's timestamp resolver
+		// ever hands back for an unquoted value, per the comment above.
+		const date = moment(raw as moment.MomentInput);
 		if (!date.isValid()) return null;
 		if (date.clone().utc().format("HH:mm:ss") === "00:00:00") {
 			date.startOf("day");
@@ -497,8 +500,14 @@ export class NotesListView extends ItemView {
 			openNote(evt);
 		});
 
+		// "clickable-icon" is Obsidian's own convention for icon-only buttons —
+		// adding it (and using "is-active" for the pinned state, also Obsidian's
+		// own convention) gets the muted/bold-on-hover/accent-when-active states
+		// from Obsidian's own app.css almost for free, instead of fighting its
+		// generic button reset (see styles.css for why that fight needed
+		// !important before this).
 		const pinButton = itemHeader.createEl("button", {
-			cls: "notes-list-pin-button" + (entry.pinned ? " is-pinned" : ""),
+			cls: "notes-list-pin-button clickable-icon" + (entry.pinned ? " is-active" : ""),
 			attr: { "aria-label": entry.pinned ? "Unpin note" : "Pin note", type: "button" },
 		});
 		setIcon(pinButton, "bookmark");
@@ -517,7 +526,7 @@ export class NotesListView extends ItemView {
 		});
 
 		if (this.shouldShowNoteName(file)) {
-			item.createEl("div", { text: file.basename, cls: "notes-list-title" });
+			item.createDiv({ text: file.basename, cls: "notes-list-title" });
 		}
 
 		const contentEl = item.createDiv({ cls: "notes-list-content" });

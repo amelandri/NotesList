@@ -86,9 +86,14 @@ export default class NotesListPlugin extends Plugin {
 			void this.activateView();
 		});
 
+		// id/name deliberately don't repeat the plugin's own id/name — Obsidian
+		// already prefixes every command with the plugin name in the command
+		// palette ("Notes List: Open"), and namespaces ids internally, so doing
+		// it here too would just be redundant (and is flagged by the community
+		// plugin review as such).
 		this.addCommand({
-			id: "open-notes-list",
-			name: "Open Notes List",
+			id: "open",
+			name: "Open",
 			callback: () => {
 				void this.activateView();
 			},

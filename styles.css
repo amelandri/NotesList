@@ -11,7 +11,7 @@
 	display: flex;
 	align-items: flex-start;
 	gap: 3rem;
-	padding: var(--size-4-4) !important;
+	padding: var(--size-4-4);
 }
 
 .notes-list-main {
@@ -201,32 +201,29 @@
 	text-decoration: underline;
 }
 
+/* The button also carries Obsidian's own "clickable-icon" class (see
+   view.ts) — verified directly by inspecting Obsidian's own app.css that
+   this is what's needed to dodge its generic `button:not(.clickable-icon)`
+   reset, which otherwise wins the cascade over a plain custom class here
+   (that reset's specificity — one type selector + one :not() pseudo-class,
+   which counts as its argument's specificity — beats a single plain class).
+   .clickable-icon's own base/:hover rules already give the muted/bold-on-
+   hover behavior for free; only the sizing below and the accent-when-pinned
+   color still need to be layered on top, and neither needs !important:
+   sizing doesn't compete with anything, and .is-active's color ties on
+   specificity with .clickable-icon.is-active's own but wins on source order,
+   since this stylesheet loads after Obsidian's own. */
 .notes-list-pin-button {
 	flex-shrink: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
 	width: 22px;
 	height: 22px;
 	padding: 0;
 	border-radius: 50%;
-	background-color: transparent !important;
-	/* !important on all three color rules below: Obsidian's own button/icon
-	   styles otherwise win the cascade over a plain single-class selector like
-	   this one, which is what made the muted/bold-on-hover/accent-when-pinned
-	   states fail to show at all before this. .is-pinned needs it too, or the
-	   base rule's !important would block it outright regardless of which one
-	   is more specific. */
-	color: var(--icon-color) !important;
 	cursor: pointer;
 }
 
-.notes-list-pin-button:hover {
-	color: var(--icon-color-hover) !important;
-}
-
-.notes-list-pin-button.is-pinned {
-	color: var(--text-accent) !important;
+.notes-list-pin-button.is-active {
+	color: var(--text-accent);
 }
 
 .notes-list-pin-button svg {

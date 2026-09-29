@@ -118,7 +118,7 @@ function renderChildren(
 			toggle.addEventListener("click", () => onToggleCollapse(child.path));
 		}
 
-		const label = row.createEl("span", {
+		const label = row.createSpan({
 			cls: "notes-tag-tree-label" + (child.path === selectedPath ? " is-selected" : ""),
 		});
 		label.createSpan({ text: child.segment });

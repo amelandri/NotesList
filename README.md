@@ -19,7 +19,7 @@ Notes List turns a vault folder into a browsable timeline: a chronological list 
 
 ## Installation
 
-Not on the Community Plugins directory yet — install manually from source:
+Submitted to the Community Plugins directory and currently awaiting review — until it's approved, install manually from source:
 
 ```bash
 npm install
