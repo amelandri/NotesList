@@ -1,17 +1,17 @@
-// Release script: bumps the version everywhere, builds, tags, pushes "dev",
+// Release script: bumps the version everywhere, moves CHANGELOG.md's
+// "Unreleased" entries under the new version, builds, tags, pushes "dev",
 // fast-forwards "main" to match it, and publishes a GitHub release with the
-// built plugin artifacts attached.
+// built plugin artifacts attached and that version's changelog entries as its
+// release notes.
 //
-// Usage: node release.mjs <version> ["release notes"]
+// Usage: node release.mjs <version>
 //   version        - required, plain semver x.y.z (Obsidian's own
 //                    manifest.json requirement — no "v" prefix, no
 //                    pre-release suffix)
-//   release notes  - optional; defaults to a generic one-liner with a
-//                    compare link. Edit the release on GitHub afterwards if
-//                    you want something more specific.
 //
 // Must be run from "dev", with a clean working tree, up to date with
-// "origin/dev".
+// "origin/dev", and with at least one entry under CHANGELOG.md's
+// "## [Unreleased]" heading (Keep a Changelog format).
 //
 // Safe to re-run with the same version after a failure partway through
 // (e.g. a transient "remote rejected ... (failed)" from GitHub on a push):
@@ -34,6 +34,7 @@ const REQUIRED_BRANCH = "dev";
 const MANIFEST_PATH = "manifest.json";
 const PACKAGE_PATH = "package.json";
 const VERSIONS_PATH = "versions.json";
+const CHANGELOG_PATH = "CHANGELOG.md";
 const RELEASE_ASSETS = [
 	["main.js", "application/javascript"],
 	["manifest.json", "application/json"],
@@ -93,6 +94,65 @@ function isGreaterSemver(next, current) {
 	return nPatch > cPatch;
 }
 
+// --- CHANGELOG.md (Keep a Changelog format) ---
+
+// A link reference definition line, e.g. "[0.1.6]: https://..." or
+// "[#1]: https://...". These sit at the bottom of the file, after the last
+// version section.
+const LINK_DEF = /^\[([^\]]+)\]:\s*\S+/;
+
+// The body of the "## [name]" section: from the line after its heading up to
+// the next "## " heading or the link definitions at the bottom.
+function findChangelogSection(lines, name) {
+	const heading = lines.findIndex((line) => line.startsWith(`## [${name}]`));
+	if (heading === -1) return null;
+	let end = heading + 1;
+	while (end < lines.length && !lines[end].startsWith("## ") && !LINK_DEF.test(lines[end])) end++;
+	return { start: heading + 1, end, body: lines.slice(heading + 1, end).join("\n").trim() };
+}
+
+// Moves the "Unreleased" entries under a new "## [version] - date" heading,
+// leaving "Unreleased" empty, and updates the compare links at the bottom.
+function releaseChangelog(text, version, previousVersion, date, repoUrl) {
+	const lines = text.split("\n");
+	if (findChangelogSection(lines, version)) fail(`${CHANGELOG_PATH} already has a "## [${version}]" section.`);
+	const unreleased = findChangelogSection(lines, "Unreleased");
+	if (!unreleased) fail(`${CHANGELOG_PATH} has no "## [Unreleased]" section.`);
+	if (!unreleased.body) fail(`${CHANGELOG_PATH}'s "Unreleased" section is empty — list this release's changes there first.`);
+
+	lines.splice(unreleased.start, unreleased.end - unreleased.start, "", `## [${version}] - ${date}`, "", unreleased.body, "");
+
+	const unreleasedLink = lines.findIndex((line) => line.startsWith("[Unreleased]:"));
+	if (unreleasedLink === -1) fail(`${CHANGELOG_PATH} has no "[Unreleased]: ..." link definition.`);
+	lines.splice(
+		unreleasedLink,
+		1,
+		`[Unreleased]: ${repoUrl}/compare/${version}...HEAD`,
+		`[${version}]: ${repoUrl}/compare/${previousVersion}...${version}`,
+	);
+	return lines.join("\n");
+}
+
+// The version's changelog entries, as GitHub release notes. Reference-style
+// links used in them ("[#1]") only resolve with their definitions, which live
+// at the bottom of the changelog, so the ones actually used are appended.
+function changelogReleaseNotes(text, version) {
+	const lines = text.split("\n");
+	const section = findChangelogSection(lines, version);
+	if (!section?.body) fail(`${CHANGELOG_PATH} has no entries for ${version}.`);
+	const definitions = lines.filter((line) => {
+		const match = line.match(LINK_DEF);
+		return match && section.body.includes(`[${match[1]}]`);
+	});
+	return definitions.length ? `${section.body}\n\n${definitions.join("\n")}` : section.body;
+}
+
+function localDate() {
+	const now = new Date();
+	const pad = (n) => String(n).padStart(2, "0");
+	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 // Reuses the same stored credential "git push" already uses (macOS Keychain,
 // or whatever git's own credential helper resolves to) — no separate token
 // setup needed, and no risk of pasting a token where it could get logged.
@@ -135,6 +195,16 @@ async function createRelease(owner, repo, token, tagName, notes) {
 	return res.json();
 }
 
+async function updateReleaseNotes(owner, repo, token, releaseId, notes) {
+	const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/${releaseId}`, {
+		method: "PATCH",
+		headers: githubHeaders(token, { "Content-Type": "application/json" }),
+		body: JSON.stringify({ body: notes }),
+	});
+	if (!res.ok) fail(`updating the GitHub release notes failed (${res.status}): ${await res.text()}`);
+	return res.json();
+}
+
 async function deleteAsset(owner, repo, token, assetId) {
 	const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/assets/${assetId}`, {
 		method: "DELETE",
@@ -158,9 +228,11 @@ async function uploadAsset(uploadUrlTemplate, token, filePath, contentType) {
 // --- 1. Parse and validate the version argument ---
 
 const version = process.argv[2];
-const notesArg = process.argv[3];
 
-if (!version) fail('missing version argument. Usage: node release.mjs <version> ["release notes"]');
+if (!version) fail("missing version argument. Usage: node release.mjs <version>");
+if (process.argv.length > 3) {
+	fail(`unexpected extra arguments. Release notes now come from ${CHANGELOG_PATH}'s "Unreleased" section.`);
+}
 if (!/^\d+\.\d+\.\d+$/.test(version)) {
 	fail(`"${version}" isn't a plain x.y.z version (no "v" prefix, no pre-release suffix).`);
 }
@@ -208,6 +280,7 @@ if (resuming && !(headIsBump && manifest.version === version)) {
 	fail(`tag "${version}" is on HEAD, but HEAD isn't the "${bumpSubject}" commit with manifest.json at ${version}.`);
 }
 
+const [owner, repo] = parseOwnerRepo(capture("git remote get-url origin"));
 const versions = readJson(VERSIONS_PATH);
 let previousVersion;
 
@@ -224,7 +297,18 @@ if (resuming) {
 	previousVersion = manifest.version;
 	console.log(`\nReleasing ${previousVersion} -> ${version}\n`);
 
-	// --- 3. Bump the version everywhere ---
+	// --- 3. Bump the version everywhere, move "Unreleased" under it ---
+	// The changelog is computed first: it's the step that can refuse (e.g. an
+	// empty "Unreleased"), so nothing has been written yet if it does.
+
+	const changelog = releaseChangelog(
+		readFileSync(CHANGELOG_PATH, "utf8"),
+		version,
+		previousVersion,
+		localDate(),
+		`https://github.com/${owner}/${repo}`,
+	);
+	writeFileSync(CHANGELOG_PATH, changelog, "utf8");
 
 	manifest.version = version;
 	writeJson(MANIFEST_PATH, manifest);
@@ -244,7 +328,7 @@ if (resuming) {
 try {
 	run("npm run build");
 } catch {
-	if (!resuming) run(`git checkout -- ${MANIFEST_PATH} ${PACKAGE_PATH} ${VERSIONS_PATH}`);
+	if (!resuming) run(`git checkout -- ${MANIFEST_PATH} ${PACKAGE_PATH} ${VERSIONS_PATH} ${CHANGELOG_PATH}`);
 	fail(resuming ? "build failed." : "build failed — version bump reverted, nothing committed.");
 }
 
@@ -253,7 +337,7 @@ try {
 // script, not Claude.
 
 if (!resuming) {
-	run(`git add ${MANIFEST_PATH} ${PACKAGE_PATH} ${VERSIONS_PATH}`);
+	run(`git add ${MANIFEST_PATH} ${PACKAGE_PATH} ${VERSIONS_PATH} ${CHANGELOG_PATH}`);
 	run(`git commit -m "${bumpSubject}"`);
 }
 if (!existingTagCommit) run(`git tag -a ${version} -m "${version}"`);
@@ -272,13 +356,16 @@ try {
 
 // --- 7. GitHub release with the built artifacts ---
 
-const [owner, repo] = parseOwnerRepo(capture("git remote get-url origin"));
 const token = getGithubToken();
-const notes = notesArg || `Release ${version}.\n\nFull history: https://github.com/${owner}/${repo}/compare/${previousVersion}...${version}`;
+// Read from the committed changelog, so a resumed run gets the same notes.
+const notes =
+	changelogReleaseNotes(readFileSync(CHANGELOG_PATH, "utf8"), version) +
+	`\n\n**Full changelog**: https://github.com/${owner}/${repo}/compare/${previousVersion}...${version}`;
 
 let release = await findRelease(owner, repo, token, version);
 if (release) {
-	console.log("\nGitHub release already exists — reusing it, replacing its assets.");
+	console.log("\nGitHub release already exists — reusing it, replacing its notes and assets.");
+	release = await updateReleaseNotes(owner, repo, token, release.id, notes);
 } else {
 	console.log("\nCreating GitHub release...");
 	release = await createRelease(owner, repo, token, version, notes);

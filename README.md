@@ -57,6 +57,10 @@ Requires Obsidian **1.13.0** or later. The settings tab groups related controls 
 | Notes list | Notes per page | Number of notes shown per page in the list (default 10). |
 | Sidebar | Tag tree expansion | How far the tag tree is expanded by default: *Fully collapsed* / *Expand to level 2* / *Expand to level 3* / *Fully expanded* (default). You can still expand or collapse any tag by hand; changing this setting resets those manual changes. |
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).
+
 ## Development
 
 See [CLAUDE.md](./CLAUDE.md) for build commands and an architecture overview.
