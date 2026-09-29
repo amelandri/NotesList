@@ -124,6 +124,19 @@ export default class NotesListPlugin extends Plugin {
 			},
 		});
 
+		// Opens (or reveals) the view and puts the cursor in its search field.
+		// Also no default hotkey, for the same reason as above; inside the view,
+		// Mod+F and "/" already do this (see NotesListView.onOpen()).
+		this.addCommand({
+			id: "search-notes",
+			name: "Search notes",
+			callback: () => {
+				void this.activateView().then((leaf) => {
+					if (leaf.view instanceof NotesListView) leaf.view.focusSearch();
+				});
+			},
+		});
+
 		this.addSettingTab(new NotesListSettingTab(this.app, this));
 
 		this.registerEvent(this.app.vault.on("modify", (f: TAbstractFile) => this.onVaultEvent(f)));
@@ -267,7 +280,7 @@ export default class NotesListPlugin extends Plugin {
 		}
 	}
 
-	async activateView(): Promise<void> {
+	async activateView(): Promise<WorkspaceLeaf> {
 		const { workspace } = this.app;
 
 		let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(VIEW_TYPE_NOTES_LIST)[0] ?? null;
@@ -276,6 +289,7 @@ export default class NotesListPlugin extends Plugin {
 			await leaf.setViewState({ type: VIEW_TYPE_NOTES_LIST, active: true });
 		}
 		await workspace.revealLeaf(leaf);
+		return leaf;
 	}
 
 	async loadSettings(): Promise<void> {

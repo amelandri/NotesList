@@ -49,6 +49,11 @@ export class TFolder {
 	children: unknown[] = [];
 }
 
+export class Scope {
+	constructor(_parent?: unknown) {}
+	register(): void {}
+}
+
 export class ItemView {
 	app: unknown;
 	contentEl: unknown;

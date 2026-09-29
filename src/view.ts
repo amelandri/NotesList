@@ -5,6 +5,7 @@ import {
 	EventRef,
 	ItemView,
 	MarkdownRenderer,
+	Scope,
 	TFile,
 	WorkspaceLeaf,
 	getAllTags,
@@ -15,6 +16,7 @@ import type { ContentDisplayMode, TagTreeExpandLevel } from "./settings";
 import { renderHeatmap, type HeatmapSelection } from "./heatmap";
 import { buildTagTree, isCollapsedByDefault, renderTagTree, tagMatchesFilter } from "./tagTree";
 import { Moment, moment } from "./moment";
+import { SearchIndex, parseSearchQuery } from "./searchIndex";
 
 export const VIEW_TYPE_NOTES_LIST = "notes-list-view";
 
@@ -187,6 +189,13 @@ function internalVault(app: App): VaultInternal {
 	return app.vault as unknown as VaultInternal;
 }
 
+// Whether a key event is aimed at something the user is typing into, where a
+// bare-key shortcut like "/" must type the character instead of firing.
+function isEditableTarget(target: EventTarget | null): boolean {
+	if (!(target instanceof HTMLElement)) return false;
+	return target.isContentEditable || target.closest("input, textarea, select") !== null;
+}
+
 export class NotesListView extends ItemView {
 	private plugin: NotesListPlugin;
 	private selectedTag: string | null = null;
@@ -199,6 +208,22 @@ export class NotesListView extends ItemView {
 	private tagCollapseOverrides = new Map<string, boolean>();
 	private appliedTagTreeExpandLevel: TagTreeExpandLevel | null = null;
 	private currentPage = 1;
+	// Full-text search (see searchIndex.ts). searchQuery is the submitted text
+	// (also what the input shows after a re-render, since render() rebuilds
+	// the whole DOM); searchMatches is the set of matching note paths, or null
+	// when no search is active. Both transient, like the other filters.
+	private searchQuery = "";
+	private searchMatches: Set<string> | null = null;
+	// What's typed in the field but not submitted yet. render() rebuilds the
+	// whole DOM, and runs for reasons the user didn't trigger (a vault event,
+	// a sync), so the draft, focus and caret are carried over explicitly —
+	// otherwise a background refresh mid-typing would wipe the field.
+	private searchDraft = "";
+	private searchInputEl: HTMLInputElement | null = null;
+	// Set when focusSearch() is called before the field exists yet (e.g. the
+	// "Search notes" command opening the view), consumed by the next render.
+	private pendingSearchFocus = false;
+	private searchIndex = new SearchIndex<TFile>(async (file) => stripFrontmatter(await this.app.vault.cachedRead(file)));
 	// Populated by rebuildEntries() — the expensive per-note scan (metadata
 	// lookup, date resolution, tag extraction). Reused across render()s that
 	// only change UI state (pagination, filter selection, tag-tree collapse),
@@ -232,6 +257,23 @@ export class NotesListView extends ItemView {
 	}
 
 	async onOpen(): Promise<void> {
+		// Shortcuts active only while this view is focused; a view's scope takes
+		// precedence over the app's global hotkeys while it is. Mod+F is
+		// Obsidian's "Search current file", which only works in an editor and
+		// does nothing here, so claiming it inside this view loses nothing.
+		this.scope = new Scope(this.app.scope);
+		this.scope.register(["Mod"], "f", () => {
+			this.focusSearch();
+			return false;
+		});
+		// "/" with any modifiers (null), because on some layouts it takes Shift
+		// (Shift+7 on an Italian keyboard). A real Ctrl/Cmd/Alt chord is left
+		// alone, and so is typing a "/" into a text field.
+		this.scope.register(null, "/", (evt) => {
+			if (evt.ctrlKey || evt.metaKey || evt.altKey || isEditableTarget(evt.target)) return;
+			this.focusSearch();
+			return false;
+		});
 		this.registerEvent(
 			internalVault(this.app).on("config-changed", (key) => {
 				// Only affects the is-readable-line-width CSS class — no need to
@@ -300,7 +342,55 @@ export class NotesListView extends ItemView {
 	// anything that only changes UI state.
 	async refresh(): Promise<void> {
 		this.rebuildEntries();
+		const files = this.cachedEntries.map((entry) => entry.file);
+		if (this.searchMatches) {
+			// A search is active: bring the index up to date (normally just the
+			// note(s) that triggered this refresh) and re-run it, so the results
+			// reflect the edit instead of going stale.
+			await this.searchIndex.update(files);
+			this.searchMatches = this.searchIndex.search(files, parseSearchQuery(this.searchQuery));
+		} else {
+			// Otherwise keep the index warm in the background — on first open
+			// this reads every note once — so a search submitted later only
+			// has to scan memory. Not awaited: rendering the list never waits
+			// on it.
+			void this.searchIndex.update(files);
+		}
 		await this.render();
+	}
+
+	focusSearch(): void {
+		if (this.searchInputEl?.isConnected) {
+			this.searchInputEl.focus();
+			this.searchInputEl.select();
+		} else {
+			this.pendingSearchFocus = true;
+		}
+	}
+
+	private async runSearch(query: string): Promise<void> {
+		const terms = parseSearchQuery(query);
+		this.currentPage = 1;
+		if (terms.length === 0) {
+			this.clearSearch();
+			return;
+		}
+		this.searchQuery = query.trim();
+		this.searchDraft = this.searchQuery;
+		const files = this.cachedEntries.map((entry) => entry.file);
+		// Usually a no-op: the background pre-warm from refresh() has already
+		// indexed everything, and only notes changed since then get re-read.
+		await this.searchIndex.update(files);
+		this.searchMatches = this.searchIndex.search(files, terms);
+		await this.render();
+	}
+
+	private clearSearch(): void {
+		this.searchQuery = "";
+		this.searchDraft = "";
+		this.searchMatches = null;
+		this.currentPage = 1;
+		void this.render();
 	}
 
 	private rebuildEntries(): void {
@@ -330,7 +420,8 @@ export class NotesListView extends ItemView {
 			const matchesTag = !this.selectedTag || entry.tags.some((tag) => tagMatchesFilter(tag, this.selectedTag!));
 			const matchesDate = !this.selectedDate || entry.date.format("YYYY-MM-DD") === this.selectedDate;
 			const matchesMonth = !this.selectedMonth || entry.date.format("YYYY-MM") === this.selectedMonth;
-			return matchesTag && matchesDate && matchesMonth;
+			const matchesSearch = !this.searchMatches || this.searchMatches.has(entry.file.path);
+			return matchesTag && matchesDate && matchesMonth && matchesSearch;
 		});
 
 		// Pinned notes float to the top, each group still newest-first: allEntries
@@ -341,6 +432,12 @@ export class NotesListView extends ItemView {
 			...filteredEntries.filter((entry) => entry.pinned),
 			...filteredEntries.filter((entry) => !entry.pinned),
 		];
+
+		const previousInput = this.searchInputEl;
+		const searchFocus =
+			previousInput && previousInput.ownerDocument.activeElement === previousInput
+				? { start: previousInput.selectionStart, end: previousInput.selectionEnd }
+				: null;
 
 		const container = this.contentEl;
 		container.empty();
@@ -363,6 +460,10 @@ export class NotesListView extends ItemView {
 		setIcon(newNoteButton, "plus");
 		newNoteButton.addEventListener("click", () => void this.plugin.createUniqueNote());
 
+		// Awaited only at the very end, after the sidebar is built: each note's
+		// content fill is the slow, async part of render(), and the search field
+		// shouldn't vanish from under the user's cursor while it runs.
+		let noteRenders: Promise<void>[] = [];
 		if (visibleEntries.length === 0) {
 			mainEl.createEl("p", {
 				text: this.buildEmptyMessage(),
@@ -406,10 +507,12 @@ export class NotesListView extends ItemView {
 				}
 				renders.push(this.renderEntry(mainEl, entry));
 			}
-			await Promise.all(renders);
+			noteRenders = renders;
 
 			this.renderPagination(mainEl, totalPages);
 		}
+
+		this.renderSearchForm(heatmapPanel, searchFocus);
 
 		heatmapPanel.createEl("h4", { text: "Activity", cls: "notes-list-panel-title" });
 		const heatmapSelection: HeatmapSelection = {
@@ -438,9 +541,13 @@ export class NotesListView extends ItemView {
 		// reserved and the Tags section below never shifts when a filter is
 		// toggled on/off. When nothing is selected, that placeholder pill is
 		// just hidden via CSS (.is-empty) rather than left out of the DOM.
-		const hasActiveFilter = Boolean(this.selectedTag || this.selectedDate || this.selectedMonth);
+		const hasActiveFilter = Boolean(this.selectedTag || this.selectedDate || this.selectedMonth || this.searchMatches);
 		const activeFilters = heatmapPanel.createDiv({ cls: "notes-list-active-filters" });
 		activeFilters.toggleClass("is-empty", !hasActiveFilter);
+
+		if (this.searchMatches) {
+			this.renderFilterPill(activeFilters, `"${this.searchQuery}"`, "Clear search", () => this.clearSearch());
+		}
 
 		if (this.selectedTag) {
 			this.renderFilterPill(activeFilters, `#${this.selectedTag}`, "Clear tag filter", () => {
@@ -503,15 +610,51 @@ export class NotesListView extends ItemView {
 				void this.render();
 			}
 		);
+
+		await Promise.all(noteRenders);
+	}
+
+	// Runs only on submit (the button, or Enter in the field), never while
+	// typing: each search is one in-memory scan plus a full render(), so it's
+	// triggered deliberately rather than on every keystroke.
+	private renderSearchForm(
+		container: HTMLElement,
+		restoreFocus: { start: number | null; end: number | null } | null
+	): void {
+		const form = container.createEl("form", { cls: "notes-list-search" });
+		const inputContainer = form.createDiv({ cls: "search-input-container" });
+		const input = inputContainer.createEl("input", {
+			type: "search",
+			placeholder: "Search notes",
+			value: this.searchDraft,
+			attr: { "aria-label": "Search notes", enterkeyhint: "search", spellcheck: "false" },
+		});
+		input.addEventListener("input", () => {
+			this.searchDraft = input.value;
+		});
+		this.searchInputEl = input;
+		if (restoreFocus) {
+			input.focus();
+			input.setSelectionRange(restoreFocus.start, restoreFocus.end);
+		} else if (this.pendingSearchFocus) {
+			this.pendingSearchFocus = false;
+			this.focusSearch();
+		}
+		form.createEl("button", { text: "Search", cls: "notes-list-search-button", attr: { type: "submit" } });
+		form.addEventListener("submit", (evt) => {
+			evt.preventDefault();
+			void this.runSearch(input.value);
+		});
 	}
 
 	private buildEmptyMessage(): string {
+		const searchPart = this.searchMatches ? `matching "${this.searchQuery}"` : "";
 		const tagPart = this.selectedTag ? `tagged #${this.selectedTag}` : "";
 		const datePart = this.selectedDate ? `on ${moment(this.selectedDate).format("D MMM YYYY")}` : "";
 		const monthPart = this.selectedMonth
 			? `in ${moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY")}`
 			: "";
-		const parts = [tagPart, datePart, monthPart].filter(Boolean);
+		const parts = [searchPart, tagPart, datePart, monthPart].filter(Boolean);
 
 		if (parts.length === 0) return "No notes found in the configured folder.";
 

@@ -65,6 +65,32 @@
 	min-width: 0;
 }
 
+/* Full-text search form at the top of the sidebar: the field takes the
+   remaining width, the button keeps its natural size. .search-input-container
+   is Obsidian's own markup for a search field (search icon, built-in clear
+   button), so it looks like every other search box in the app. */
+.notes-list-search {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	margin-bottom: var(--size-4-4);
+}
+
+.notes-list-search .search-input-container {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.notes-list-search .search-input-container input {
+	width: 100%;
+	border-radius: var(--radius-m);
+}
+
+.notes-list-search-button {
+	flex-shrink: 0;
+	border-radius: var(--radius-m);
+}
+
 .notes-list-filter-pill {
 	display: inline-flex;
 	align-items: center;
@@ -399,7 +425,7 @@
 }
 
 .notes-tag-tree-panel {
-	margin-top: 3rem;
+	margin-top: var(--size-4-4);
 }
 
 .notes-tag-tree-empty {
