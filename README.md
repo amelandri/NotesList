@@ -14,7 +14,7 @@ Notes List turns a vault folder into a browsable timeline: a chronological list 
 - **Tag browser** — a collapsible tree of every tag found in the notes in scope, each with a count of matching notes. Click a tag to filter the list to it (including its nested sub-tags, e.g. `#area/work` under `#area`).
 - **Combine filters** — the tag, day and month filters can all be active together, each with its own pill (and `x`) below the heatmap to clear just that one.
 - **Pagination** — long lists are split into pages, so browsing stays fast no matter how many notes are in the folder.
-- **New Note button** — creates a new, uniquely-named note directly in the watched folder in one click, with today's date already set. No other plugin required; optionally starts from a template note of your choice (see Settings below).
+- **New Note button** — creates a new, uniquely-named note directly in the watched folder in one click, with today's date already set. No other plugin required; optionally starts from a template note of your choice (see Settings below). Also available as the **Create new note** command, so you can assign it your own keyboard shortcut from Settings → Hotkeys — it works even when the Notes List view isn't open.
 - Respects Obsidian's own "Readable line length" setting, and refreshes automatically as notes in the folder are created, edited, deleted, renamed, or have their frontmatter changed.
 
 ## Installation

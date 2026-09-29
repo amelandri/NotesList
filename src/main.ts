@@ -1,5 +1,6 @@
 import {
 	App,
+	Notice,
 	Plugin,
 	PluginSettingTab,
 	SettingGroup,
@@ -8,6 +9,7 @@ import {
 	TFile,
 	WorkspaceLeaf,
 	debounce,
+	moment,
 	normalizePath,
 } from "obsidian";
 import {
@@ -30,6 +32,35 @@ import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
 // round-trip through normalizePath as-is. Shared by both settings below.
 function normalizeOptionalPath(path: string): string {
 	return path.trim() === "" ? "" : normalizePath(path);
+}
+
+// Filesystem-illegal characters across platforms (Windows is the strictest),
+// swapped for a plain hyphen — a user-supplied uniqueNoteNameFormat could
+// otherwise place e.g. a literal "/" straight into the generated file name
+// (moment.js format tokens don't use it, but plain text in the format string
+// passes through verbatim), which would silently create the note in a
+// subfolder instead of failing loudly.
+function sanitizeFilenameSegment(name: string): string {
+	return name.replace(/[\\/:*?"<>|]/g, "-").trim() || "note";
+}
+
+// "metadataTypeManager" is an undocumented internal surface with no public
+// typings (verified in app.js) that Obsidian's own Properties panel uses to
+// remember which widget a property name should render with — "text", "date",
+// "datetime" (its fixed internal name for the "Date & time" picker; not to be
+// confused with this plugin's own "timestamp" property name below, which is
+// just the property this widget type happens to be assigned to), etc. —
+// persisted to .obsidian/types.json. setType() is what a property picker
+// calls the moment a value is set through it — calling it ourselves right
+// after writing "timestamp" via processFrontMatter means a brand new vault
+// shows the proper date+time picker for it immediately, without requiring a
+// template or a manual one-time Properties-panel edit.
+interface MetadataTypeManagerInternal {
+	setType(name: string, type: string): Promise<void>;
+}
+
+function internalMetadataTypeManager(app: App): MetadataTypeManagerInternal {
+	return (app as unknown as { metadataTypeManager: MetadataTypeManagerInternal }).metadataTypeManager;
 }
 
 export default class NotesListPlugin extends Plugin {
@@ -60,6 +91,19 @@ export default class NotesListPlugin extends Plugin {
 			name: "Open Notes List",
 			callback: () => {
 				void this.activateView();
+			},
+		});
+
+		// Deliberately no default hotkey (Obsidian's own plugin guidelines
+		// advise against setting one, to avoid clashing with the user's
+		// existing bindings) — assign one from Settings → Hotkeys instead. This
+		// is the same action as the "New Note" button in the view, but callable
+		// (and bindable to a shortcut) even when no Notes List view is open.
+		this.addCommand({
+			id: "create-new-note",
+			name: "Create new note",
+			callback: () => {
+				void this.createUniqueNote();
 			},
 		});
 
@@ -111,6 +155,99 @@ export default class NotesListPlugin extends Plugin {
 		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
 			frontmatter.pinned = pinned;
 		});
+	}
+
+	// Falls back to DEFAULT_UNIQUE_NOTE_NAME_FORMAT whenever the setting is
+	// blank, rather than persisting that fallback into the setting itself —
+	// used identically here and by NotesListView's "whenDifferent" detection,
+	// so the two always agree on what counts as an auto-generated name.
+	uniqueNoteNameFormat(): string {
+		return this.settings.uniqueNoteNameFormat.trim() || DEFAULT_UNIQUE_NOTE_NAME_FORMAT;
+	}
+
+	private notePath(folderPath: string, basename: string): string {
+		return folderPath ? `${folderPath}/${basename}.md` : `${basename}.md`;
+	}
+
+	// If settings.templatePath is set, the template note's frontmatter must
+	// already declare a "timestamp" property (any value — it gets overwritten
+	// with "now" regardless, same as the no-template case) so the resulting
+	// note's shape is something the user actually configured, not silently
+	// invented. Returns null (after surfacing a Notice) when the template is
+	// unusable for any reason, which createUniqueNote() treats as "abort,
+	// don't create anything" rather than falling back to a blank note —
+	// misconfigured templatePath should be fixed, not silently ignored.
+	private async resolveTemplateContent(): Promise<string | null> {
+		const templatePath = this.settings.templatePath;
+		if (!templatePath) return "";
+
+		const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
+		if (!(templateFile instanceof TFile)) {
+			new Notice(`Notes List: template not found at "${templatePath}". Check the Template setting.`);
+			return null;
+		}
+
+		const frontmatter = this.app.metadataCache.getFileCache(templateFile)?.frontmatter;
+		if (!frontmatter || !("timestamp" in frontmatter)) {
+			new Notice(
+				`Notes List: the template note "${templatePath}" is missing a "timestamp" property in its frontmatter. Add one (any value) to use it as a template.`
+			);
+			return null;
+		}
+
+		return this.app.vault.cachedRead(templateFile);
+	}
+
+	// Self-contained: no dependency on any other plugin. Creates the note
+	// directly inside the watched folder (so it immediately shows up in the
+	// list), pre-fills "timestamp" to now, and registers that property's type
+	// so the Properties panel shows the proper date+time picker even in a
+	// brand new vault with no prior "timestamp" property and no template.
+	// Called both from the view's "New Note" button and the
+	// "Create new note" command, so it works from a user-assigned hotkey too,
+	// with no Notes List view needing to be open.
+	async createUniqueNote(): Promise<void> {
+		try {
+			const content = await this.resolveTemplateContent();
+			if (content === null) return;
+
+			const folderPath = this.settings.folderPath;
+			if (folderPath && !this.app.vault.getAbstractFileByPath(folderPath)) {
+				await this.app.vault.createFolder(folderPath);
+			}
+
+			const stamp = sanitizeFilenameSegment(moment().format(this.uniqueNoteNameFormat()));
+			let basename = stamp;
+			for (let suffix = 2; this.app.vault.getAbstractFileByPath(this.notePath(folderPath, basename)); suffix++) {
+				basename = `${stamp}-${suffix}`;
+			}
+
+			const file = await this.app.vault.create(this.notePath(folderPath, basename), content);
+			await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+				frontmatter.timestamp = moment().format("YYYY-MM-DDTHH:mm:ss");
+			});
+
+			// Isolated in its own try/catch, deliberately: the note itself is
+			// already fully created and correctly dated by this point, so a
+			// failure here (metadataTypeManager is undocumented and could change
+			// in a future Obsidian release) should degrade to "no auto-registered
+			// picker widget" rather than being reported as "failed to create the
+			// note" — which would be misleading, since it already exists on disk.
+			// The second argument is Obsidian's own fixed internal widget-type
+			// name for its "Date & time" picker (see MetadataTypeManagerInternal
+			// above) — it's not related to, and doesn't need to match, the
+			// property name in the first argument.
+			try {
+				await internalMetadataTypeManager(this.app).setType("timestamp", "datetime");
+			} catch (error) {
+				console.warn('Notes List: could not register "timestamp" as a Date & time property', error);
+			}
+
+			await this.app.workspace.getLeaf(false).openFile(file);
+		} catch (error) {
+			console.error("Notes List: failed to create a new note", error);
+			new Notice("Could not create the note — see the developer console for details.");
+		}
 	}
 
 	async activateView(): Promise<void> {
