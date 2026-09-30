@@ -845,7 +845,10 @@ export class NotesListView extends ItemView {
 		pinButton.addEventListener("click", () => void this.togglePin(entry, file));
 
 		if (this.shouldShowNoteName(file)) {
-			item.createDiv({ text: file.basename, cls: "notes-list-title" });
+			// Opens on double-click too, like the body below (plain text, so no
+			// links or buttons to step around).
+			const title = item.createDiv({ text: file.basename, cls: "notes-list-title" });
+			title.addEventListener("dblclick", openNote);
 		}
 
 		// "markdown-rendered" is the class Obsidian's own reading view puts on
