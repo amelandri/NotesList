@@ -635,6 +635,16 @@
 	padding-left: 0;
 }
 
+/* The "Untagged" entry, always last: set slightly apart and in italics, so
+   it doesn't read as a real tag of that name. */
+.notes-tag-tree > .notes-tag-tree-untagged {
+	margin-top: var(--size-2-3);
+}
+
+.notes-tag-tree-untagged .notes-tag-tree-label {
+	font-style: italic;
+}
+
 .notes-tag-tree-item {
 	margin: var(--size-2-1) 0;
 }

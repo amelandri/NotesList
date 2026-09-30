@@ -22,6 +22,18 @@ export function tagMatchesFilter(tag: string, filter: string): boolean {
 	return normalized === normalizedFilter || normalized.startsWith(`${normalizedFilter}/`);
 }
 
+/** The tag filter's "Untagged" choice: notes with no tags at all. A symbol, so no real tag path can ever collide with it. */
+export const UNTAGGED = Symbol("untagged");
+
+/** What the tag tree can select: a tag path, or UNTAGGED. */
+export type TagFilter = string | typeof UNTAGGED;
+
+/** Whether a note carrying `tags` passes the tag filter. */
+export function noteMatchesTagFilter(tags: string[], filter: TagFilter): boolean {
+	if (filter === UNTAGGED) return tags.length === 0;
+	return tags.some((tag) => tagMatchesFilter(tag, filter));
+}
+
 // Children are keyed by lowercased segment so "#Project" and "#project" merge
 // into one node — whichever casing is seen first wins for display (segment)
 // and for the node's own path (used as the filter value), and every later
@@ -84,28 +96,41 @@ export function isCollapsedByDefault(depth: number, level: TagTreeExpandLevel): 
 export function renderTagTree(
 	container: HTMLElement,
 	root: TagTreeNode,
-	selectedPath: string | null,
+	untaggedCount: number,
+	selectedPath: TagFilter | null,
 	isCollapsed: (path: string, depth: number) => boolean,
-	onSelect: (path: string) => void,
+	onSelect: (filter: TagFilter) => void,
 	onSetCollapsed: (path: string, collapsed: boolean) => void
 ): void {
 	container.empty();
 
 	if (root.children.size === 0) {
 		container.createEl("p", { text: "No tags.", cls: "notes-tag-tree-empty" });
-		return;
+	} else {
+		renderChildren(container, root, 1, selectedPath, isCollapsed, onSelect, onSetCollapsed);
 	}
 
-	renderChildren(container, root, 1, selectedPath, isCollapsed, onSelect, onSetCollapsed);
+	// Always last, and always present (even with zero untagged notes), so it
+	// sits in a predictable spot. Same row markup as a tag, with an empty
+	// toggle so its label lines up with the top-level tags.
+	const list = container.createEl("ul", { cls: "notes-tag-tree-list notes-tag-tree-untagged" });
+	const row = list.createEl("li", { cls: "notes-tag-tree-item" }).createDiv({ cls: "notes-tag-tree-row" });
+	row.createSpan({ cls: "notes-tag-tree-toggle" });
+	const label = row.createSpan({
+		cls: "notes-tag-tree-label" + (selectedPath === UNTAGGED ? " is-selected" : ""),
+	});
+	label.createSpan({ text: "Untagged" });
+	label.createSpan({ text: ` (${untaggedCount})`, cls: "notes-tag-tree-count" });
+	label.addEventListener("click", () => onSelect(UNTAGGED));
 }
 
 function renderChildren(
 	container: HTMLElement,
 	node: TagTreeNode,
 	depth: number,
-	selectedPath: string | null,
+	selectedPath: TagFilter | null,
 	isCollapsed: (path: string, depth: number) => boolean,
-	onSelect: (path: string) => void,
+	onSelect: (filter: TagFilter) => void,
 	onSetCollapsed: (path: string, collapsed: boolean) => void
 ): void {
 	const children = Array.from(node.children.values()).sort((a, b) =>

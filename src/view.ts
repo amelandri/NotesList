@@ -14,7 +14,14 @@ import {
 import type NotesListPlugin from "./main";
 import type { ContentDisplayMode, TagTreeExpandLevel } from "./settings";
 import { renderHeatmap, type HeatmapSelection } from "./heatmap";
-import { buildTagTree, isCollapsedByDefault, renderTagTree, tagMatchesFilter } from "./tagTree";
+import {
+	buildTagTree,
+	isCollapsedByDefault,
+	noteMatchesTagFilter,
+	renderTagTree,
+	UNTAGGED,
+	type TagFilter,
+} from "./tagTree";
 import { Moment, moment } from "./moment";
 import { SearchIndex, parseSearchQuery } from "./searchIndex";
 
@@ -202,7 +209,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 export class NotesListView extends ItemView {
 	private plugin: NotesListPlugin;
-	private selectedTag: string | null = null;
+	private selectedTag: TagFilter | null = null;
 	private selectedDate: string | null = null;
 	private selectedMonth: string | null = null;
 	// Tags the user has expanded/collapsed by hand (path -> collapsed),
@@ -439,7 +446,7 @@ export class NotesListView extends ItemView {
 		const allEntries = this.cachedEntries;
 
 		const filteredEntries = allEntries.filter((entry) => {
-			const matchesTag = !this.selectedTag || entry.tags.some((tag) => tagMatchesFilter(tag, this.selectedTag!));
+			const matchesTag = !this.selectedTag || noteMatchesTagFilter(entry.tags, this.selectedTag);
 			const matchesDate = !this.selectedDate || entry.date.format("YYYY-MM-DD") === this.selectedDate;
 			const matchesMonth = !this.selectedMonth || entry.date.format("YYYY-MM") === this.selectedMonth;
 			const matchesSearch = !this.searchMatches || this.searchMatches.has(entry.file.path);
@@ -573,7 +580,8 @@ export class NotesListView extends ItemView {
 		}
 
 		if (this.selectedTag) {
-			this.renderFilterPill(activeFilters, `#${this.selectedTag}`, "Clear tag filter", () => {
+			const tagLabel = this.selectedTag === UNTAGGED ? "Untagged" : `#${this.selectedTag}`;
+			this.renderFilterPill(activeFilters, tagLabel, "Clear tag filter", () => {
 				this.selectedTag = null;
 				this.currentPage = 1;
 				void this.render();
@@ -631,10 +639,11 @@ export class NotesListView extends ItemView {
 		renderTagTree(
 			tagPanel.createDiv({ cls: "notes-tag-tree" }),
 			tagTree,
+			allEntries.filter((e) => e.tags.length === 0).length,
 			this.selectedTag,
 			(path, depth) => this.tagCollapseOverrides.get(path) ?? isCollapsedByDefault(depth, expandLevel),
-			(path) => {
-				this.selectedTag = path;
+			(filter) => {
+				this.selectedTag = filter;
 				this.currentPage = 1;
 				// Fold the section back in the narrow layout, so the filtered list
 				// is right there; its filter pill stays visible above.
@@ -700,7 +709,8 @@ export class NotesListView extends ItemView {
 
 	private buildEmptyMessage(): string {
 		const searchPart = this.searchMatches ? `matching "${this.searchQuery}"` : "";
-		const tagPart = this.selectedTag ? `tagged #${this.selectedTag}` : "";
+		const tagPart =
+			this.selectedTag === UNTAGGED ? "without tags" : this.selectedTag ? `tagged #${this.selectedTag}` : "";
 		const datePart = this.selectedDate ? `on ${moment(this.selectedDate).format("D MMM YYYY")}` : "";
 		const monthPart = this.selectedMonth
 			? `in ${moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY")}`

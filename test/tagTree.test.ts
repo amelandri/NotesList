@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { buildTagTree, isCollapsedByDefault, tagMatchesFilter } from "../src/tagTree";
+import { buildTagTree, isCollapsedByDefault, noteMatchesTagFilter, tagMatchesFilter, UNTAGGED } from "../src/tagTree";
+
+describe("noteMatchesTagFilter", () => {
+	it("with UNTAGGED, matches only notes with no tags at all", () => {
+		expect(noteMatchesTagFilter([], UNTAGGED)).toBe(true);
+		expect(noteMatchesTagFilter(["#area"], UNTAGGED)).toBe(false);
+	});
+
+	it("with a tag path, matches notes carrying that tag or a sub-tag", () => {
+		expect(noteMatchesTagFilter(["#area/work"], "area")).toBe(true);
+		expect(noteMatchesTagFilter(["#journal"], "area")).toBe(false);
+		expect(noteMatchesTagFilter([], "area")).toBe(false);
+	});
+});
 
 describe("tagMatchesFilter", () => {
 	it("matches an exact tag case-insensitively", () => {

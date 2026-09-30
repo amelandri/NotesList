@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Separate desktop and mobile values for all the "Notes list" and "Sidebar" settings (note name, content display, preview length, date group headers, notes per page, tag tree expansion). Each setting still appears once in the settings tab, and changing it only affects the kind of device you're on. Existing values are copied to both on upgrade.
+- An "Untagged" entry, always last in the tag list, that filters the list to notes with no tags, with its own note count.
 - `--notes-list-panel-title-font-size` and `--notes-list-mobile-panel-title-font-size` CSS variables, for the size of the "Notes", "Activity" and "Tags" section titles.
 
 ### Changed

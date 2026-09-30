@@ -6,12 +6,14 @@ Notes List turns a vault folder into a browsable timeline: a chronological list 
 
 ## Features
 
-- **Chronological list** — every note in a folder you choose (optionally including its subfolders), newest first. Each entry shows its date and time, an optional file name, and its content — full or a preview, your choice.
-- **Date from frontmatter** — a note's date and time come from its own property named `timestamp` (set it via Obsidian's own "Date & time" property type in the Properties panel), falling back to the file's last-modified time if it isn't set. Click the date to open the note.
+Open the view from the ribbon icon ("Open notes list") or the **Notes List: Open** command.
+
+- **Chronological list** — every note in a folder you choose (optionally including its subfolders), newest first. Each entry shows its date and time, an optional file name, and its content — full or a preview, your choice. A preview never cuts a code block or a table in half: it extends to the end of that block instead.
+- **Date from frontmatter** — a note's date and time come from its own property named `timestamp` (set it via Obsidian's own "Date & time" property type in the Properties panel), falling back to the file's last-modified time if it isn't set. Click the date, or double-click the note's content, to open the note.
 - **Pin notes** — click the bookmark icon on a note to keep it pinned to the top of the list, ahead of everything else matching the current filter. The pin is stored as a `pinned` property in the note's own frontmatter, so it's visible in the note itself and travels with it across a rename or move.
 - **Date group headers** (optional) — "Today" / "Yesterday" / "This week" / "Older" labels above the list, so it's obvious at a glance when notes were written.
-- **Activity heatmap** — a GitHub-contributions-style grid of the last 6 months, shaded by how many notes were created each day. Click a day or a month label to filter the list down to it.
-- **Tag browser** — a collapsible tree of every tag found in the notes in scope, each with a count of matching notes. Click a tag to filter the list to it (including its nested sub-tags, e.g. `#area/work` under `#area`).
+- **Activity heatmap** — a GitHub-contributions-style grid of the last 6 months, shaded by how many notes were created each day. Click a day or a month label to filter the list down to it. A month that only covers the first (or last) week column is labeled with just its initial, like "S.", so labels never overlap; hover any label for the full month name.
+- **Tag browser** — a collapsible tree of every tag found in the notes in scope, each with a count of matching notes. Click a tag to filter the list to it (including its nested sub-tags, e.g. `#area/work` under `#area`). An *Untagged* entry, always at the end of the list, shows the notes that have no tags at all.
 - **Full-text search** — a search box at the top of the sidebar finds notes containing every word you type (anywhere in the note's text or file name, case-insensitive). The search runs when you click **Search** or press Enter, not while you type, and is near-instant even in folders with thousands of notes: note text is indexed in the background as soon as the view opens. Press **/** or **Cmd+F** (**Ctrl+F** on Windows/Linux) while the view is focused to jump to the search box, or use the **Search notes** command (assign it your own shortcut from Settings → Hotkeys) to open the view straight into it.
 - **Combine filters** — the search, tag, day and month filters can all be active together, each with its own pill (and `x`) below the heatmap to clear just that one.
 - **Pagination** — long lists are split into pages, so browsing stays fast no matter how many notes are in the folder.
@@ -64,15 +66,15 @@ Requires Obsidian **1.13.0** or later. The settings tab groups related controls 
 
 The size of the notes' text can be changed with a [CSS snippet](https://help.obsidian.md/snippets), separately for the regular layout and for the single-column (mobile) one:
 
-| Variable | Affects | Default |
-| --- | --- | --- |
-| `--notes-list-content-font-size` | Note content | Inherited from Obsidian |
-| `--notes-list-content-line-height` | Line height of the note content's paragraphs | `1.4rem` |
-| `--notes-list-title-font-size` | Note file name | Inherited from Obsidian |
-| `--notes-list-date-font-size` | Date and time link | Obsidian's small UI font size |
-| `--notes-list-panel-title-font-size` | Section titles ("Notes", "Activity", "Tags") | Obsidian's level-4 heading size |
+| Variable | Affects | Default | Default in single column |
+| --- | --- | --- | --- |
+| `--notes-list-content-font-size` | Note content | Inherited from Obsidian | `1.1rem` |
+| `--notes-list-content-line-height` | Line height of the note content's paragraphs | `1.4rem` | `1.4rem` |
+| `--notes-list-title-font-size` | Note file name | Inherited from Obsidian | 1.1 × inherited (`1.1em`) |
+| `--notes-list-date-font-size` | Date and time link | Obsidian's small UI font size | Obsidian's small UI font size |
+| `--notes-list-panel-title-font-size` | Section titles ("Notes", "Activity", "Tags") | Obsidian's level-4 heading size | `1.1rem` |
 
-Each one has a `--notes-list-mobile-…` counterpart (for example `--notes-list-mobile-content-font-size`) that applies only in the single-column layout. When a mobile variable isn't set, the regular one is used.
+Each one has a `--notes-list-mobile-…` counterpart (for example `--notes-list-mobile-content-font-size`) that applies only in the single-column layout. In that layout the mobile variable wins if set, then the regular one, then the single-column default above.
 
 ```css
 body {
