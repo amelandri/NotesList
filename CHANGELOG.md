@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-30
+
 ### Added
 
 - Separate desktop and mobile values for all the "Notes list" and "Sidebar" settings (note name, content display, preview length, date group headers, notes per page, tag tree expansion). Each setting still appears once in the settings tab, and changing it only affects the kind of device you're on. Existing values are copied to both on upgrade.
@@ -112,7 +114,8 @@ Initial release.
 - Double-clicking a note's content opens the note.
 - The notes column follows Obsidian's "Readable line length" setting.
 
-[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.2...HEAD
+[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.3...HEAD
+[0.2.3]: https://github.com/amelandri/NotesList/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/amelandri/NotesList/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/amelandri/NotesList/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/amelandri/NotesList/compare/0.1.6...0.2.0
