@@ -1,6 +1,7 @@
 import {
 	App,
 	Notice,
+	Platform,
 	Plugin,
 	PluginSettingTab,
 	SettingDefinitionItem,
@@ -14,10 +15,13 @@ import {
 	ContentDisplayMode,
 	DEFAULT_SETTINGS,
 	DEFAULT_UNIQUE_NOTE_NAME_FORMAT,
+	DeviceSettings,
 	NotesListSettings,
 	ShowNoteNameMode,
 	TagTreeExpandLevel,
+	deviceSettingKey,
 	migrateSettings,
+	resolveDeviceSettings,
 } from "./settings";
 import { moment } from "./moment";
 import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
@@ -314,6 +318,15 @@ export default class NotesListPlugin extends Plugin {
 		await this.saveData(this.settings);
 		this.requestRefresh();
 	}
+
+	/**
+	 * The "Notes list"/"Sidebar" settings for this device: the mobile set in
+	 * the Obsidian mobile app (phone or tablet), the desktop set otherwise.
+	 * Always read these through here, never the raw fields on `settings`.
+	 */
+	deviceSettings(): DeviceSettings {
+		return resolveDeviceSettings(this.settings, Platform.isMobile);
+	}
 }
 
 // Declarative settings API (Obsidian 1.13.0+, hence manifest.json's
@@ -362,16 +375,34 @@ class NotesListSettingTab extends PluginSettingTab {
 					},
 				],
 			},
+			// Only this device's values: each device edits its own set, so there
+			// are no duplicated fields in the tab.
+			...this.deviceGroups(Platform.isMobile),
+		];
+	}
+
+	// The "Notes list" and "Sidebar" groups, bound to one platform's fields
+	// (deviceSettingKey). Headings stay the same on every device; a note row
+	// at the top (no control) explains that these values are per device type.
+	private deviceGroups(mobile: boolean): SettingDefinitionItem<keyof NotesListSettings>[] {
+		const key = <K extends Parameters<typeof deviceSettingKey>[0]>(name: K) => deviceSettingKey(name, mobile);
+		const thisDevice = mobile ? "the mobile app (phone and tablet)" : "the desktop app";
+		const otherDevice = mobile ? "the desktop app" : "the mobile app";
+		return [
 			{
 				type: "group",
 				heading: "Notes list",
 				items: [
 					{
+						name: "Device-specific settings",
+						desc: `The settings in this section and in the sidebar section are saved separately for each kind of device. Changes made here apply only to ${thisDevice}; ${otherDevice} keeps its own values.`,
+					},
+					{
 						name: "Show note name",
 						desc: "Whether to show each note's file name.",
 						control: {
 							type: "dropdown",
-							key: "showNoteName",
+							key: key("showNoteName"),
 							options: {
 								never: "Never",
 								always: "Always",
@@ -384,7 +415,7 @@ class NotesListSettingTab extends PluginSettingTab {
 						desc: 'Show a note\'s full content or a truncated preview. A note can override this with "content-display" frontmatter property.',
 						control: {
 							type: "dropdown",
-							key: "contentDisplay",
+							key: key("contentDisplay"),
 							options: { full: "Full", preview: "Preview" } satisfies Record<ContentDisplayMode, string>,
 						},
 					},
@@ -393,7 +424,7 @@ class NotesListSettingTab extends PluginSettingTab {
 						desc: "Maximum number of characters shown when Content display is set to Preview.",
 						control: {
 							type: "number",
-							key: "previewLength",
+							key: key("previewLength"),
 							defaultValue: DEFAULT_SETTINGS.previewLength,
 							min: 1,
 							step: 1,
@@ -403,14 +434,14 @@ class NotesListSettingTab extends PluginSettingTab {
 					{
 						name: "Show date group headers",
 						desc: 'Show "Today" / "Yesterday" / "This week" / "Older" headers above notes in the list.',
-						control: { type: "toggle", key: "showDateGroups" },
+						control: { type: "toggle", key: key("showDateGroups") },
 					},
 					{
 						name: "Notes per page",
 						desc: "Number of notes shown per page in the list.",
 						control: {
 							type: "number",
-							key: "notesPerPage",
+							key: key("notesPerPage"),
 							defaultValue: DEFAULT_SETTINGS.notesPerPage,
 							min: 1,
 							step: 1,
@@ -428,7 +459,7 @@ class NotesListSettingTab extends PluginSettingTab {
 						desc: "How far the tag tree is expanded when it's shown. You can still expand or collapse any tag by hand.",
 						control: {
 							type: "dropdown",
-							key: "tagTreeExpandLevel",
+							key: key("tagTreeExpandLevel"),
 							defaultValue: DEFAULT_SETTINGS.tagTreeExpandLevel,
 							options: {
 								"1": "Fully collapsed",

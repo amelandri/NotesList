@@ -447,7 +447,7 @@ export class NotesListView extends ItemView {
 		this.markdownComponent.unload();
 		this.markdownComponent = new Component();
 
-		const { notesPerPage } = this.plugin.settings;
+		const { notesPerPage } = this.plugin.deviceSettings();
 		const allEntries = this.cachedEntries;
 
 		const filteredEntries = allEntries.filter((entry) => {
@@ -532,7 +532,7 @@ export class NotesListView extends ItemView {
 			const renders: Promise<void>[] = [];
 			let lastGroup: string | null = null;
 			for (const entry of pageEntries) {
-				if (this.plugin.settings.showDateGroups && !entry.pinned) {
+				if (this.plugin.deviceSettings().showDateGroups && !entry.pinned) {
 					const group = dateGroupLabel(entry.date);
 					if (group !== lastGroup) {
 						mainEl.createDiv({ cls: "notes-list-date-group-header", text: group });
@@ -635,7 +635,7 @@ export class NotesListView extends ItemView {
 			void this.render();
 		});
 		const tagTree = buildTagTree(allEntries.map((e) => e.tags));
-		const expandLevel = this.plugin.settings.tagTreeExpandLevel;
+		const expandLevel = this.plugin.deviceSettings().tagTreeExpandLevel;
 		if (expandLevel !== this.appliedTagTreeExpandLevel) {
 			this.tagCollapseOverrides.clear();
 			this.appliedTagTreeExpandLevel = expandLevel;
@@ -753,7 +753,7 @@ export class NotesListView extends ItemView {
 	}
 
 	private shouldShowNoteName(file: TFile): boolean {
-		switch (this.plugin.settings.showNoteName) {
+		switch (this.plugin.deviceSettings().showNoteName) {
 			case "always":
 				return true;
 			case "whenDifferent":
@@ -769,7 +769,7 @@ export class NotesListView extends ItemView {
 	private resolveContentDisplay(fm: Record<string, unknown> | undefined): ContentDisplayMode {
 		const override = fm?.["content-display"];
 		if (override === "full" || override === "preview") return override;
-		return this.plugin.settings.contentDisplay;
+		return this.plugin.deviceSettings().contentDisplay;
 	}
 
 	private async togglePin(entry: NoteEntry, file: TFile): Promise<void> {
@@ -847,7 +847,7 @@ export class NotesListView extends ItemView {
 		let body = stripFrontmatter(raw).trim();
 
 		if (this.resolveContentDisplay(cache?.frontmatter) === "preview") {
-			body = truncateMarkdown(body, this.plugin.settings.previewLength);
+			body = truncateMarkdown(body, this.plugin.deviceSettings().previewLength);
 		}
 
 		await MarkdownRenderer.render(this.app, body, contentEl, file.path, this.markdownComponent);

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Separate desktop and mobile values for all the "Notes list" and "Sidebar" settings (note name, content display, preview length, date group headers, notes per page, tag tree expansion). Each setting still appears once in the settings tab, and changing it only affects the kind of device you're on. Existing values are copied to both on upgrade.
+
 ## [0.2.2] - 2026-09-30
 
 ### Added

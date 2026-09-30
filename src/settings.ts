@@ -26,6 +26,48 @@ export interface NotesListSettings {
 	templatePath: string;
 	/** Default expansion of the sidebar's tag tree — see TagTreeExpandLevel. The user can still expand/collapse individual tags by hand. */
 	tagTreeExpandLevel: TagTreeExpandLevel;
+
+	// Mobile (phone/tablet app) counterparts of the device-specific settings
+	// above (DEVICE_SETTING_KEYS): the unprefixed field is the desktop value.
+	// Both live in the same, synced data.json, and resolveDeviceSettings()
+	// picks one set at runtime.
+	mobileContentDisplay: ContentDisplayMode;
+	mobilePreviewLength: number;
+	mobileNotesPerPage: number;
+	mobileShowNoteName: ShowNoteNameMode;
+	mobileShowDateGroups: boolean;
+	mobileTagTreeExpandLevel: TagTreeExpandLevel;
+}
+
+/** The "Notes list" and "Sidebar" settings, which have a separate value on the desktop and mobile apps. */
+export const DEVICE_SETTING_KEYS = [
+	"showNoteName",
+	"contentDisplay",
+	"previewLength",
+	"showDateGroups",
+	"notesPerPage",
+	"tagTreeExpandLevel",
+] as const;
+
+export type DeviceSettingKey = (typeof DEVICE_SETTING_KEYS)[number];
+export type MobileSettingKey<K extends DeviceSettingKey = DeviceSettingKey> = `mobile${Capitalize<K>}`;
+export type DeviceSettings = Pick<NotesListSettings, DeviceSettingKey>;
+
+/** The settings field holding `key`'s value on the given platform. */
+export function deviceSettingKey<K extends DeviceSettingKey>(key: K, mobile: boolean): K | MobileSettingKey<K> {
+	return mobile ? (`mobile${key.charAt(0).toUpperCase()}${key.slice(1)}` as MobileSettingKey<K>) : key;
+}
+
+/** The device-specific settings in effect on this platform (mobile = the Obsidian mobile app, phone or tablet). */
+export function resolveDeviceSettings(settings: NotesListSettings, mobile: boolean): DeviceSettings {
+	return {
+		showNoteName: settings[deviceSettingKey("showNoteName", mobile)],
+		contentDisplay: settings[deviceSettingKey("contentDisplay", mobile)],
+		previewLength: settings[deviceSettingKey("previewLength", mobile)],
+		showDateGroups: settings[deviceSettingKey("showDateGroups", mobile)],
+		notesPerPage: settings[deviceSettingKey("notesPerPage", mobile)],
+		tagTreeExpandLevel: settings[deviceSettingKey("tagTreeExpandLevel", mobile)],
+	};
 }
 
 /** Fallback used whenever uniqueNoteNameFormat is blank — also this plugin's out-of-the-box default, matching the pattern Obsidian's own "Unique note creator" core plugin used to generate (this plugin no longer depends on or reads from it). */
@@ -54,6 +96,17 @@ const SETTINGS_MIGRATIONS: Array<(data: Record<string, unknown>) => void> = [
 		data.contentDisplay = hasPreviewLength ? "preview" : "full";
 		data.previewLength = hasPreviewLength ? chars : DEFAULT_SETTINGS.previewLength;
 		delete data.contentPreviewChars;
+	},
+	// v1 -> v2: the "Notes list" and "Sidebar" settings became device-specific
+	// (DEVICE_SETTING_KEYS), each gaining a mobile* twin. The saved value
+	// seeds both, so upgrading changes nothing on either device until the
+	// user sets them apart. A field never saved stays unset, so both fall
+	// back to the same default.
+	(data) => {
+		for (const key of DEVICE_SETTING_KEYS) {
+			const mobileKey = deviceSettingKey(key, true);
+			if (key in data && !(mobileKey in data)) data[mobileKey] = data[key];
+		}
 	},
 ];
 
@@ -84,4 +137,10 @@ export const DEFAULT_SETTINGS: NotesListSettings = {
 	uniqueNoteNameFormat: DEFAULT_UNIQUE_NOTE_NAME_FORMAT,
 	templatePath: "",
 	tagTreeExpandLevel: "all",
+	mobileContentDisplay: "preview",
+	mobilePreviewLength: 300,
+	mobileNotesPerPage: 10,
+	mobileShowNoteName: "whenDifferent",
+	mobileShowDateGroups: false,
+	mobileTagTreeExpandLevel: "all",
 };

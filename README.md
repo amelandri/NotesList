@@ -58,6 +58,8 @@ Requires Obsidian **1.13.0** or later. The settings tab groups related controls 
 | Notes list | Notes per page | Number of notes shown per page in the list (default 10). |
 | Sidebar | Tag tree expansion | How far the tag tree is expanded by default: *Fully collapsed* / *Expand to level 2* / *Expand to level 3* / *Fully expanded* (default). You can still expand or collapse any tag by hand; changing this setting resets those manual changes. |
 
+**Desktop and mobile.** The *Notes list* and *Sidebar* settings have two independent values: one for the desktop app and one for the Obsidian mobile app (phone and tablet). The settings tab shows each setting once, and changing it only affects the kind of device you're on, as a note at the top of the *Notes list* group reminds you. So to change the mobile values, open the settings from your phone or tablet. Both sets are saved in the plugin's settings file and synced with your vault, so changing one never overwrites the other. When upgrading from a version without this split, your existing values are copied to both sets.
+
 ## Customizing font sizes
 
 The size of the notes' text can be changed with a [CSS snippet](https://help.obsidian.md/snippets), separately for the regular layout and for the single-column (mobile) one:
