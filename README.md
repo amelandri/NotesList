@@ -16,7 +16,7 @@ Notes List turns a vault folder into a browsable timeline: a chronological list 
 - **Combine filters** — the search, tag, day and month filters can all be active together, each with its own pill (and `x`) below the heatmap to clear just that one.
 - **Pagination** — long lists are split into pages, so browsing stays fast no matter how many notes are in the folder.
 - **New Note button** — creates a new, uniquely-named note directly in the watched folder in one click, with today's date already set. No other plugin required; optionally starts from a template note of your choice (see Settings below). Also available as the **Create new note** command, so you can assign it your own keyboard shortcut from Settings → Hotkeys — it works even when the Notes List view isn't open.
-- **Works on mobile** — on a phone, or in any pane narrower than 720 px, the view stacks into a single column: search, heatmap, a collapsible Tags section, then the notes.
+- **Works on mobile** — on a phone, or in any pane narrower than 720 px, the view stacks into a single column: search, heatmap, a collapsible Tags section, then the notes. The New Note button becomes a floating button in the bottom-right corner.
 - Respects Obsidian's own "Readable line length" setting, and refreshes automatically as notes in the folder are created, edited, deleted, renamed, or have their frontmatter changed.
 
 ## Installation
@@ -57,6 +57,28 @@ Requires Obsidian **1.13.0** or later. The settings tab groups related controls 
 | Notes list | Show date group headers | Show "Today" / "Yesterday" / "This week" / "Older" headers above the list (default off). |
 | Notes list | Notes per page | Number of notes shown per page in the list (default 10). |
 | Sidebar | Tag tree expansion | How far the tag tree is expanded by default: *Fully collapsed* / *Expand to level 2* / *Expand to level 3* / *Fully expanded* (default). You can still expand or collapse any tag by hand; changing this setting resets those manual changes. |
+
+## Customizing font sizes
+
+The size of the notes' text can be changed with a [CSS snippet](https://help.obsidian.md/snippets), separately for the regular layout and for the single-column (mobile) one:
+
+| Variable | Affects | Default |
+| --- | --- | --- |
+| `--notes-list-content-font-size` | Note content | Inherited from Obsidian |
+| `--notes-list-content-line-height` | Line height of the note content's paragraphs | `1.4rem` |
+| `--notes-list-title-font-size` | Note file name | Inherited from Obsidian |
+| `--notes-list-date-font-size` | Date and time link | Obsidian's small UI font size |
+
+Each one has a `--notes-list-mobile-…` counterpart (for example `--notes-list-mobile-content-font-size`) that applies only in the single-column layout. When a mobile variable isn't set, the regular one is used.
+
+```css
+body {
+	--notes-list-content-font-size: 15px;
+	--notes-list-mobile-content-font-size: 17px;
+	--notes-list-mobile-content-line-height: 1.6;
+	--notes-list-mobile-date-font-size: 14px;
+}
+```
 
 ## Changelog
 

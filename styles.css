@@ -7,6 +7,33 @@
 	overflow-y: auto;
 }
 
+/* Note typography, customizable from a CSS snippet through these public
+   variables (set them on body, :root or .notes-list-view):
+     --notes-list-content-font-size    note body        (default: inherited)
+     --notes-list-content-line-height  note paragraphs  (default: 1.4rem)
+     --notes-list-title-font-size      note file name   (default: inherited)
+     --notes-list-date-font-size       date/time link   (default: --font-ui-small)
+   and a --notes-list-mobile-* variant of each (e.g.
+   --notes-list-mobile-content-font-size), used instead in the single-column
+   layout (.is-narrow) and falling back to the regular one when unset.
+   Nothing here declares the public variables themselves, only reads them
+   with fallbacks, so a snippet's value is never overridden by this file.
+   The --nl-* ones are internal: resolved once here so each rule below reads
+   a single variable whichever layout is active. */
+.notes-list-view {
+	--nl-content-font-size: var(--notes-list-content-font-size, 1em);
+	--nl-content-line-height: var(--notes-list-content-line-height, 1.4rem);
+	--nl-title-font-size: var(--notes-list-title-font-size, 1em);
+	--nl-date-font-size: var(--notes-list-date-font-size, var(--font-ui-small));
+}
+
+.notes-list-view.is-narrow {
+	--nl-content-font-size: var(--notes-list-mobile-content-font-size, var(--notes-list-content-font-size, 1.1em));
+	--nl-content-line-height: var(--notes-list-mobile-content-line-height, var(--notes-list-content-line-height, 1.4rem));
+	--nl-title-font-size: var(--notes-list-mobile-title-font-size, var(--notes-list-title-font-size, 1.1em));
+	--nl-date-font-size: var(--notes-list-mobile-date-font-size, var(--notes-list-date-font-size, var(--font-ui-small)));
+}
+
 .notes-list-layout {
 	display: flex;
 	align-items: flex-start;
@@ -205,6 +232,7 @@
 }
 
 .notes-list-title {
+	font-size: var(--nl-title-font-size);
 	font-weight: 600;
 	margin-bottom: 0.4rem;
 }
@@ -218,7 +246,7 @@
 }
 
 .notes-list-datetime {
-	font-size: var(--font-ui-small);
+	font-size: var(--nl-date-font-size);
 	color: var(--text-accent);
 	text-decoration: none;
 }
@@ -258,11 +286,12 @@
 }
 
 .notes-list-content {
+	font-size: var(--nl-content-font-size);
 	color: color-mix(in srgb, var(--text-normal) 80%, transparent);
 }
 
 .notes-list-content p{
-	line-height: 1.4rem;
+	line-height: var(--nl-content-line-height);
 }
 
 .notes-list-content > *:first-child {
@@ -455,6 +484,58 @@
 	flex: none;
 	margin-top: 0;
 	margin-bottom: 0;
+}
+
+/* Room at the bottom so the floating button (below) never covers the last
+   note or the pagination once scrolled all the way down. */
+.notes-list-view.is-narrow .notes-list-layout {
+	padding-bottom: calc(48px + 2 * var(--size-4-4));
+}
+
+/* The header's small "new note" button gives way to a floating one. */
+.notes-list-view.is-narrow .notes-list-new-note-button {
+	display: none;
+}
+
+/* Floating "new note" button, bottom-right. It's a sibling of the scroll
+   container (.notes-list-view), positioned against the view's own container,
+   so it stays put while the list scrolls. The selectors deliberately carry
+   more than one class: Obsidian's generic `button:not(.clickable-icon)` reset
+   would otherwise win over a single class (see the pin button's note). */
+.notes-list-container {
+	position: relative;
+}
+
+.notes-list-container .notes-list-fab {
+	display: none;
+}
+
+.notes-list-container .notes-list-view.is-narrow ~ .notes-list-fab {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: absolute;
+	right: var(--size-4-4);
+	bottom: var(--size-4-4);
+	z-index: 1;
+	width: 48px;
+	height: 48px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	box-shadow: var(--shadow-s);
+	cursor: pointer;
+}
+
+.notes-list-container .notes-list-view.is-narrow ~ .notes-list-fab:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+.notes-list-container .notes-list-view.is-narrow ~ .notes-list-fab svg {
+	width: 22px;
+	height: 22px;
 }
 
 .notes-list-view.is-narrow .notes-list-search { order: 1; }

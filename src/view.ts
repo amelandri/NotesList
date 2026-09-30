@@ -292,6 +292,18 @@ export class NotesListView extends ItemView {
 		});
 		resizeObserver.observe(this.contentEl);
 		this.register(() => resizeObserver.disconnect());
+		// Floating "new note" button for the narrow layout (hidden otherwise,
+		// see styles.css). Created once, next to contentEl rather than inside
+		// it: contentEl is the scroll container and render() empties it, so
+		// here the button neither scrolls with the list nor gets rebuilt.
+		this.containerEl.addClass("notes-list-container");
+		const fab = this.containerEl.createEl("button", {
+			cls: "notes-list-fab",
+			attr: { "aria-label": "New note", type: "button" },
+		});
+		setIcon(fab, "plus");
+		fab.addEventListener("click", () => void this.plugin.createUniqueNote());
+		this.register(() => fab.remove());
 		this.registerEvent(
 			internalVault(this.app).on("config-changed", (key) => {
 				// Only affects the is-readable-line-width CSS class — no need to

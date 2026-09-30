@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CSS variables to customize the size of the notes' text, date and file name, and the content's line height, with separate `--notes-list-mobile-…` variants for the single-column layout. See "Customizing font sizes" in the README.
+
+### Changed
+
+- In the single-column layout, the new note button is now a floating, accent-colored button in the bottom-right corner.
+
 ## [0.2.1] - 2026-09-29
 
 ### Fixed
