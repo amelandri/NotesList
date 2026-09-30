@@ -294,8 +294,13 @@ export class NotesListView extends ItemView {
 		// so a narrow pane on desktop gets it too, and a phone rotated to a wide
 		// landscape doesn't. contentEl survives render()'s empty(), so the class
 		// only has to change when the width crosses the threshold.
+		// Also re-renders when the threshold is crossed, for what render() itself
+		// sizes by layout (the number of page buttons), not just CSS.
 		const resizeObserver = new ResizeObserver(() => {
-			this.contentEl.toggleClass("is-narrow", this.isNarrowLayout());
+			const narrow = this.isNarrowLayout();
+			if (narrow === this.contentEl.hasClass("is-narrow")) return;
+			this.contentEl.toggleClass("is-narrow", narrow);
+			void this.render();
 		});
 		resizeObserver.observe(this.contentEl);
 		this.register(() => resizeObserver.disconnect());
@@ -736,7 +741,8 @@ export class NotesListView extends ItemView {
 			prev.addEventListener("click", () => this.goToPage(this.currentPage - 1));
 		}
 
-		const maxVisiblePages = 5;
+		// Fewer in the single-column layout, where 10 wouldn't fit on one row.
+		const maxVisiblePages = this.isNarrowLayout() ? 5 : 10;
 		let start = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
 		const end = Math.min(totalPages, start + maxVisiblePages - 1);
 		start = Math.max(1, end - maxVisiblePages + 1);

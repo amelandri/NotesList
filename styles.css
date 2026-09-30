@@ -326,6 +326,9 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	/* A safety net for panes just too narrow for the page buttons (10 in two
+	   columns, 5 in one): wrap onto a second row rather than overflowing. */
+	flex-wrap: wrap;
 	gap: var(--size-2-2);
 	margin-top: var(--size-4-4);
 }

@@ -2,6 +2,8 @@
 
 Notes List turns a vault folder into a browsable timeline: a chronological list of its notes on one side, and a GitHub-style activity heatmap and tag browser on the other. It's a good fit for a daily journal, a work log, or any "one note per entry" habit, where seeing *when* things happened matters as much as the notes themselves.
 
+[Official Plugin Page](https://community.obsidian.md/plugins/notes-list) - [Changelog](./CHANGELOG.md)
+
 ![screenshot](images/screenshot.png)
 
 ## Features

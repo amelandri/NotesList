@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The pagination bar shows up to 10 page numbers instead of 5. The single-column (mobile) layout keeps 5, so the bar still fits on one row.
+
 ## [0.2.3] - 2026-09-30
 
 ### Added

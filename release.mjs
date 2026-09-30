@@ -111,16 +111,38 @@ function findChangelogSection(lines, name) {
 	return { start: heading + 1, end, body: lines.slice(heading + 1, end).join("\n").trim() };
 }
 
+// What "Unreleased" says when it has nothing in it. Written by the release,
+// and not a change itself: it's ignored when checking whether there's anything
+// to release, and never carried into a version's section. Replace it with the
+// first real entry.
+const UNRELEASED_PLACEHOLDER = "_No unreleased changes yet._";
+
 // Moves the "Unreleased" entries under a new "## [version] - date" heading,
-// leaving "Unreleased" empty, and updates the compare links at the bottom.
+// leaving only the placeholder under "Unreleased", and updates the compare
+// links at the bottom.
 function releaseChangelog(text, version, previousVersion, date, repoUrl) {
 	const lines = text.split("\n");
 	if (findChangelogSection(lines, version)) fail(`${CHANGELOG_PATH} already has a "## [${version}]" section.`);
 	const unreleased = findChangelogSection(lines, "Unreleased");
 	if (!unreleased) fail(`${CHANGELOG_PATH} has no "## [Unreleased]" section.`);
-	if (!unreleased.body) fail(`${CHANGELOG_PATH}'s "Unreleased" section is empty — list this release's changes there first.`);
+	const entries = unreleased.body
+		.split("\n")
+		.filter((line) => line.trim() !== UNRELEASED_PLACEHOLDER)
+		.join("\n")
+		.trim();
+	if (!entries) fail(`${CHANGELOG_PATH}'s "Unreleased" section is empty — list this release's changes there first.`);
 
-	lines.splice(unreleased.start, unreleased.end - unreleased.start, "", `## [${version}] - ${date}`, "", unreleased.body, "");
+	lines.splice(
+		unreleased.start,
+		unreleased.end - unreleased.start,
+		"",
+		UNRELEASED_PLACEHOLDER,
+		"",
+		`## [${version}] - ${date}`,
+		"",
+		entries,
+		"",
+	);
 
 	const unreleasedLink = lines.findIndex((line) => line.startsWith("[Unreleased]:"));
 	if (unreleasedLink === -1) fail(`${CHANGELOG_PATH} has no "[Unreleased]: ..." link definition.`);
