@@ -516,7 +516,7 @@
 	justify-content: center;
 	position: absolute;
 	right: var(--size-4-4);
-	bottom: var(--size-4-4);
+	bottom: 80px;
 	z-index: 1;
 	width: 48px;
 	height: 48px;
