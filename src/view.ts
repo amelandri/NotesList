@@ -292,18 +292,6 @@ export class NotesListView extends ItemView {
 		});
 		resizeObserver.observe(this.contentEl);
 		this.register(() => resizeObserver.disconnect());
-		// Floating "new note" button for the narrow layout (hidden otherwise,
-		// see styles.css). Created once, next to contentEl rather than inside
-		// it: contentEl is the scroll container and render() empties it, so
-		// here the button neither scrolls with the list nor gets rebuilt.
-		this.containerEl.addClass("notes-list-container");
-		const fab = this.containerEl.createEl("button", {
-			cls: "notes-list-fab",
-			attr: { "aria-label": "New note", type: "button" },
-		});
-		setIcon(fab, "plus");
-		fab.addEventListener("click", () => void this.plugin.createUniqueNote());
-		this.register(() => fab.remove());
 		this.registerEvent(
 			internalVault(this.app).on("config-changed", (key) => {
 				// Only affects the is-readable-line-width CSS class — no need to
@@ -688,7 +676,22 @@ export class NotesListView extends ItemView {
 			this.pendingSearchFocus = false;
 			this.focusSearch();
 		}
-		form.createEl("button", { text: "Search", cls: "notes-list-search-button", attr: { type: "submit" } });
+		// Both a label and a magnifier icon: CSS shows the label in the two-column
+		// layout and only the icon in the narrow one (.is-narrow).
+		const searchButton = form.createEl("button", {
+			cls: "notes-list-search-button",
+			attr: { type: "submit", "aria-label": "Search" },
+		});
+		setIcon(searchButton.createSpan({ cls: "notes-list-search-button-icon" }), "search");
+		searchButton.createSpan({ text: "Search", cls: "notes-list-search-button-label" });
+		// The narrow layout's "new note" button, next to the search button
+		// (hidden in two columns, where the notes header has its own).
+		const newNoteButton = form.createEl("button", {
+			cls: "notes-list-search-new-note",
+			attr: { type: "button", "aria-label": "New note" },
+		});
+		setIcon(newNoteButton, "plus");
+		newNoteButton.addEventListener("click", () => void this.plugin.createUniqueNote());
 		form.addEventListener("submit", (evt) => {
 			evt.preventDefault();
 			void this.runSearch(input.value);

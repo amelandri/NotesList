@@ -32,7 +32,16 @@ export function renderHeatmap(
 	const monthsRow = scroller.createDiv({ cls: "notes-heatmap-months" });
 	const grid = scroller.createDiv({ cls: "notes-heatmap-grid" });
 
+	// Each week column's month (of its first day), so a label knows how many
+	// columns its month spans before the next label starts.
+	const weekMonths: number[] = [];
+	for (const week = start.clone(); week.isSameOrBefore(today, "day"); week.add(1, "week")) {
+		weekMonths.push(week.month());
+	}
+	const spans = monthSpans(weekMonths);
+
 	let lastMonth = -1;
+	let weekIndex = 0;
 	const cursor = start.clone();
 
 	while (cursor.isSameOrBefore(today, "day")) {
@@ -42,7 +51,8 @@ export function renderHeatmap(
 		const label = monthsRow.createDiv({ cls: "notes-heatmap-month-label" });
 		if (weekStart.month() !== lastMonth) {
 			const monthKey = weekStart.format("YYYY-MM");
-			label.setText(weekStart.format("MMM"));
+			label.setText(monthLabelText(weekStart.format("MMM"), spans[weekIndex]));
+			label.setAttr("title", weekStart.format("MMMM YYYY"));
 			label.addClass("is-clickable");
 			if (monthKey === selectedMonth) label.addClass("is-selected");
 			label.addEventListener("click", () => onSelectMonth(monthKey));
@@ -67,6 +77,7 @@ export function renderHeatmap(
 			cell.setAttr("title", `${count} note${count === 1 ? "" : "s"} — ${date.format("D MMM")}`);
 			cell.addEventListener("click", () => onSelectDate(dateKey));
 		}
+		weekIndex++;
 	}
 
 	const legend = container.createDiv({ cls: "notes-heatmap-legend" });
@@ -82,6 +93,26 @@ export function renderHeatmap(
 		text: visibleCount === total ? totalLabel : `${visibleCount} of ${totalLabel}`,
 		cls: "notes-heatmap-total",
 	});
+}
+
+// For each week column, how many consecutive columns (itself included) share
+// its month: the room a month label has, since it starts on the month's first
+// column and overflows to the right until the next label.
+export function monthSpans(weekMonths: number[]): number[] {
+	const spans = new Array<number>(weekMonths.length);
+	for (let i = weekMonths.length - 1; i >= 0; i--) {
+		spans[i] = i + 1 < weekMonths.length && weekMonths[i + 1] === weekMonths[i] ? spans[i + 1] + 1 : 1;
+	}
+	return spans;
+}
+
+// A month label with a single column of room (the partial first month of
+// the window, or the current month when it has just started) would overlap
+// the next label, so it shrinks to its initial plus a period ("S."). The full
+// name stays in the label's tooltip.
+export function monthLabelText(shortName: string, span: number): string {
+	if (span > 1) return shortName;
+	return shortName.charAt(0).toLocaleUpperCase() + ".";
 }
 
 export function levelFor(count: number, maxCount: number): number {

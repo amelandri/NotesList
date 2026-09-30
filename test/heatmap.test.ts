@@ -1,6 +1,27 @@
 import moment from "moment";
 import { describe, expect, it } from "vitest";
-import { computeVisibleMaxCount, countByDay, levelFor } from "../src/heatmap";
+import { computeVisibleMaxCount, countByDay, levelFor, monthLabelText, monthSpans } from "../src/heatmap";
+
+describe("monthSpans", () => {
+	it("counts, for each column, the columns left in its month run", () => {
+		expect(monthSpans([3, 4, 4, 4, 4, 5, 5])).toEqual([1, 4, 3, 2, 1, 2, 1]);
+	});
+
+	it("handles an empty window", () => {
+		expect(monthSpans([])).toEqual([]);
+	});
+});
+
+describe("monthLabelText", () => {
+	it("keeps the short name when the month has more than one column", () => {
+		expect(monthLabelText("Sep", 2)).toBe("Sep");
+	});
+
+	it("shrinks to the capitalized initial plus a period with a single column", () => {
+		expect(monthLabelText("Sep", 1)).toBe("S.");
+		expect(monthLabelText("set", 1)).toBe("S.");
+	});
+});
 
 describe("countByDay", () => {
 	it("returns an empty map for no dates", () => {

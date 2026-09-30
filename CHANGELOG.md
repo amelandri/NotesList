@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Separate desktop and mobile values for all the "Notes list" and "Sidebar" settings (note name, content display, preview length, date group headers, notes per page, tag tree expansion). Each setting still appears once in the settings tab, and changing it only affects the kind of device you're on. Existing values are copied to both on upgrade.
+- `--notes-list-panel-title-font-size` and `--notes-list-mobile-panel-title-font-size` CSS variables, for the size of the "Notes", "Activity" and "Tags" section titles.
+
+### Changed
+
+- In the single-column layout, the search button shows a magnifier icon instead of its label, and the new note button sits right next to it instead of floating in the bottom-right corner. The layout also drops its outer padding, to use the whole screen width.
+
+### Fixed
+
+- Heatmap month labels no longer overlap: a month that only spans one week column (typically the first one) shows just its initial, e.g. "S.", with the full name in the tooltip.
 
 ## [0.2.2] - 2026-09-30
 

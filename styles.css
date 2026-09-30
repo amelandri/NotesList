@@ -13,6 +13,9 @@
      --notes-list-content-line-height  note paragraphs  (default: 1.4rem)
      --notes-list-title-font-size      note file name   (default: inherited)
      --notes-list-date-font-size       date/time link   (default: --font-ui-small)
+     --notes-list-panel-title-font-size  "Notes"/"Activity"/"Tags" titles
+                                       (default: --h4-size, what Obsidian
+                                       gives every h4)
    and a --notes-list-mobile-* variant of each (e.g.
    --notes-list-mobile-content-font-size), used instead in the single-column
    layout (.is-narrow) and falling back to the regular one when unset.
@@ -25,13 +28,15 @@
 	--nl-content-line-height: var(--notes-list-content-line-height, 1.4rem);
 	--nl-title-font-size: var(--notes-list-title-font-size, 1em);
 	--nl-date-font-size: var(--notes-list-date-font-size, var(--font-ui-small));
+	--nl-panel-title-font-size: var(--notes-list-panel-title-font-size, var(--h4-size));
 }
 
 .notes-list-view.is-narrow {
-	--nl-content-font-size: var(--notes-list-mobile-content-font-size, var(--notes-list-content-font-size, 1.1em));
+	--nl-content-font-size: var(--notes-list-mobile-content-font-size, var(--notes-list-content-font-size, 1.1rem));
 	--nl-content-line-height: var(--notes-list-mobile-content-line-height, var(--notes-list-content-line-height, 1.4rem));
 	--nl-title-font-size: var(--notes-list-mobile-title-font-size, var(--notes-list-title-font-size, 1.1em));
 	--nl-date-font-size: var(--notes-list-mobile-date-font-size, var(--notes-list-date-font-size, var(--font-ui-small)));
+	--nl-panel-title-font-size: var(--notes-list-mobile-panel-title-font-size, var(--notes-list-panel-title-font-size, 1.1rem));
 }
 
 .notes-list-layout {
@@ -69,8 +74,11 @@
 	top: var(--size-4-4);
 }
 
-.notes-list-panel-title {
+/* Two classes, to win over Obsidian's own `h4 { font-size: var(--h4-size) }`
+   regardless of load order. */
+.notes-list-view .notes-list-panel-title {
 	margin: 0 0 var(--size-4-2) 0;
+	font-size: var(--nl-panel-title-font-size);
 }
 
 .notes-list-header {
@@ -99,7 +107,7 @@
 .notes-list-search {
 	display: flex;
 	align-items: center;
-	gap: var(--size-2-2);
+	gap: var(--size-4-2);
 	margin-bottom: var(--size-4-4);
 }
 
@@ -116,6 +124,13 @@
 .notes-list-search-button {
 	flex-shrink: 0;
 	border-radius: var(--radius-m);
+}
+
+/* Two-column layout: the button shows its "Search" label, and the new note
+   button lives in the notes header instead (both change in .is-narrow). */
+.notes-list-search-button-icon,
+.notes-list-search .notes-list-search-new-note {
+	display: none;
 }
 
 .notes-list-filter-pill {
@@ -472,7 +487,9 @@
 	flex-direction: column;
 	align-items: stretch;
 	gap: var(--size-4-4);
-	padding: var(--size-4-3);
+	/* No inset of its own: on a phone the pane's edge is already the screen's,
+	   and every pixel of width goes to the notes and the heatmap. */
+	padding: 0;
 }
 
 .notes-list-view.is-narrow .notes-list-heatmap-panel {
@@ -486,56 +503,47 @@
 	margin-bottom: 0;
 }
 
-/* Room at the bottom so the floating button (below) never covers the last
-   note or the pagination once scrolled all the way down. */
-.notes-list-view.is-narrow .notes-list-layout {
-	padding-bottom: calc(48px + 2 * var(--size-4-4));
-}
-
-/* The header's small "new note" button gives way to a floating one. */
+/* Search row: the field, then two square icon buttons, search (magnifier
+   instead of its label) and, in place of the notes header's small one, new
+   note (accent-colored). The selectors carry several classes on purpose:
+   Obsidian's generic `button:not(.clickable-icon)` reset would otherwise win
+   over a single class (see the pin button's note). */
 .notes-list-view.is-narrow .notes-list-new-note-button {
 	display: none;
 }
 
-/* Floating "new note" button, bottom-right. It's a sibling of the scroll
-   container (.notes-list-view), positioned against the view's own container,
-   so it stays put while the list scrolls. The selectors deliberately carry
-   more than one class: Obsidian's generic `button:not(.clickable-icon)` reset
-   would otherwise win over a single class (see the pin button's note). */
-.notes-list-container {
-	position: relative;
-}
-
-.notes-list-container .notes-list-fab {
-	display: none;
-}
-
-.notes-list-container .notes-list-view.is-narrow ~ .notes-list-fab {
+.notes-list-view.is-narrow .notes-list-search .notes-list-search-button,
+.notes-list-view.is-narrow .notes-list-search .notes-list-search-new-note {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	position: absolute;
-	right: var(--size-4-4);
-	bottom: 80px;
-	z-index: 1;
-	width: 48px;
-	height: 48px;
+	flex-shrink: 0;
+	width: var(--input-height);
+	height: var(--input-height);
 	padding: 0;
-	border: none;
-	border-radius: 50%;
-	background-color: var(--interactive-accent);
-	color: var(--text-on-accent);
-	box-shadow: var(--shadow-s);
-	cursor: pointer;
+	border-radius: var(--radius-m);
 }
 
-.notes-list-container .notes-list-view.is-narrow ~ .notes-list-fab:hover {
+.notes-list-view.is-narrow .notes-list-search .notes-list-search-button-label {
+	display: none;
+}
+
+.notes-list-view.is-narrow .notes-list-search .notes-list-search-button-icon {
+	display: flex;
+}
+
+.notes-list-view.is-narrow .notes-list-search .notes-list-search-new-note {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.notes-list-view.is-narrow .notes-list-search .notes-list-search-new-note:hover {
 	background-color: var(--interactive-accent-hover);
 }
 
-.notes-list-container .notes-list-view.is-narrow ~ .notes-list-fab svg {
-	width: 22px;
-	height: 22px;
+.notes-list-view.is-narrow .notes-list-search svg {
+	width: 18px;
+	height: 18px;
 }
 
 .notes-list-view.is-narrow .notes-list-search { order: 1; }

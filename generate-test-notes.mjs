@@ -34,6 +34,42 @@ const BODY = [
 	"Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.",
 ].join("\n\n");
 
+// Tags to draw from: nested up to 4 levels, so the tag tree has parents that
+// are also used on their own (e.g. "area" and "area/work/meetings"), several
+// levels to collapse/expand, and siblings at every depth. One pair differs
+// only in casing ("Reading" vs "reading/books") to exercise the tree's
+// case-insensitive merge.
+const TAG_POOL = [
+	"area",
+	"area/work",
+	"area/work/meetings",
+	"area/work/meetings/weekly",
+	"area/work/projects/alpha",
+	"area/work/projects/beta",
+	"area/personal",
+	"area/personal/health",
+	"area/personal/finance",
+	"journal",
+	"journal/daily",
+	"journal/gratitude",
+	"Reading",
+	"reading/books",
+	"reading/articles/tech",
+	"idea",
+	"idea/app",
+	"idea/writing/blog",
+];
+
+// 0 to 3 distinct tags per note, so some notes have none at all.
+function randomTags() {
+	const picked = new Set();
+	const howMany = Math.floor(Math.random() * 4);
+	while (picked.size < howMany) {
+		picked.add(TAG_POOL[Math.floor(Math.random() * TAG_POOL.length)]);
+	}
+	return [...picked];
+}
+
 const RANGE_END = new Date();
 const RANGE_START = new Date();
 RANGE_START.setMonth(RANGE_START.getMonth() - 6);
@@ -74,7 +110,10 @@ for (let i = 0; i < count; i++) {
 		filePath = resolve(targetDir, `${stamp}-${suffix++}.md`);
 	}
 
-	const frontmatter = `---\ntimestamp: "${formatFrontmatterTimestamp(date)}"\n---\n\n`;
+	// Obsidian's own list form for the "tags" property (no leading "#").
+	const tags = randomTags();
+	const tagsYaml = tags.length ? `tags:\n${tags.map((tag) => `  - ${tag}`).join("\n")}\n` : "";
+	const frontmatter = `---\ntimestamp: "${formatFrontmatterTimestamp(date)}"\n${tagsYaml}---\n\n`;
 	writeFileSync(filePath, frontmatter + BODY + "\n", "utf8");
 }
 

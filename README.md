@@ -16,7 +16,7 @@ Notes List turns a vault folder into a browsable timeline: a chronological list 
 - **Combine filters** — the search, tag, day and month filters can all be active together, each with its own pill (and `x`) below the heatmap to clear just that one.
 - **Pagination** — long lists are split into pages, so browsing stays fast no matter how many notes are in the folder.
 - **New Note button** — creates a new, uniquely-named note directly in the watched folder in one click, with today's date already set. No other plugin required; optionally starts from a template note of your choice (see Settings below). Also available as the **Create new note** command, so you can assign it your own keyboard shortcut from Settings → Hotkeys — it works even when the Notes List view isn't open.
-- **Works on mobile** — on a phone, or in any pane narrower than 720 px, the view stacks into a single column: search, heatmap, a collapsible Tags section, then the notes. The New Note button becomes a floating button in the bottom-right corner.
+- **Works on mobile** — on a phone, or in any pane narrower than 720 px, the view stacks into a single column: search, heatmap, a collapsible Tags section, then the notes. The search button shows just a magnifier icon, with the New Note button right next to it.
 - Respects Obsidian's own "Readable line length" setting, and refreshes automatically as notes in the folder are created, edited, deleted, renamed, or have their frontmatter changed.
 
 ## Installation
@@ -70,6 +70,7 @@ The size of the notes' text can be changed with a [CSS snippet](https://help.obs
 | `--notes-list-content-line-height` | Line height of the note content's paragraphs | `1.4rem` |
 | `--notes-list-title-font-size` | Note file name | Inherited from Obsidian |
 | `--notes-list-date-font-size` | Date and time link | Obsidian's small UI font size |
+| `--notes-list-panel-title-font-size` | Section titles ("Notes", "Activity", "Tags") | Obsidian's level-4 heading size |
 
 Each one has a `--notes-list-mobile-…` counterpart (for example `--notes-list-mobile-content-font-size`) that applies only in the single-column layout. When a mobile variable isn't set, the regular one is used.
 
