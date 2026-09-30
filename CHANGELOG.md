@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-30
+
 ### Added
 
 - CSS variables to customize the size of the notes' text, date and file name, and the content's line height, with separate `--notes-list-mobile-…` variants for the single-column layout. See "Customizing font sizes" in the README.
@@ -96,7 +98,8 @@ Initial release.
 - Double-clicking a note's content opens the note.
 - The notes column follows Obsidian's "Readable line length" setting.
 
-[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.1...HEAD
+[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.2...HEAD
+[0.2.2]: https://github.com/amelandri/NotesList/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/amelandri/NotesList/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/amelandri/NotesList/compare/0.1.6...0.2.0
 [0.1.6]: https://github.com/amelandri/NotesList/compare/0.1.5...0.1.6
