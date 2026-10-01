@@ -4,3 +4,6 @@ main.js
 data.json
 .DS_Store
 *.swp
+
+# Local deploy script: holds personal vault paths, not shared (see CLAUDE.md)
+copy-to-vault.mjs

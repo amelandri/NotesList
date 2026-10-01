@@ -10,7 +10,7 @@ Notes List turns a vault folder into a browsable timeline: a chronological list 
 
 Open the view from the ribbon icon ("Open notes list") or the **Notes List: Open** command.
 
-- **Chronological list** — every note in a folder you choose (optionally including its subfolders), newest first. Each entry shows its date and time, an optional file name, and its content — full or a preview, your choice. A preview never cuts a code block or a table in half: it extends to the end of that block instead.
+- **Chronological list** — every note in a folder you choose (optionally including its subfolders), newest first. Each entry shows its date and time, an optional file name, and its content — full or a preview, your choice. A preview never cuts a code block or a table in half: it extends to the end of that block instead. To choose exactly where a note's preview ends, put `<!-- more -->` at that point (see [Preview break](#preview-break)).
 - **Note tags** — each note's tags are shown as a row of pills below its content, gathered from both its `tags` frontmatter property and the `#tags` written in its text. Inline tags are taken out of the displayed text, so they appear once, in that row (tags inside code are left alone, as Obsidian doesn't treat them as tags). Click a tag to filter the list by it.
 - **Date from frontmatter** — a note's date and time come from its own property named `timestamp` (set it via Obsidian's own "Date & time" property type in the Properties panel), falling back to the file's last-modified time if it isn't set. Click the date, or double-click the note's file name or content, to open the note.
 - **Pin notes** — click the bookmark icon on a note to keep it pinned to the top of the list, ahead of everything else matching the current filter. The pin is stored as a `pinned` property in the note's own frontmatter, so it's visible in the note itself and travels with it across a rename or move.
@@ -44,7 +44,7 @@ npm run build
 
 Then copy `manifest.json`, `main.js` and `styles.css` into `<your-vault>/.obsidian/plugins/notes-list/`, and enable the plugin from Settings → Community plugins.
 
-For local development, `npm run deploy` builds and copies those three files straight into a vault in one step (see `copy-to-vault.mjs`; defaults to a path set for local testing, override with `OBSIDIAN_VAULT_PATH`).
+For local development, `npm run deploy` builds and runs `copy-to-vault.mjs`, which copies those three files into your vault's `.obsidian/plugins/notes-list/` folder. That script is local and not part of the repository, since it holds your own vault path: create it next to `package.json`, reading the vault path from wherever suits you (for example `process.env.OBSIDIAN_VAULT_PATH`).
 
 ## Settings
 
@@ -64,6 +64,16 @@ Requires Obsidian **1.13.0** or later. The settings tab groups related controls 
 | Sidebar | Tag tree expansion | How far the tag tree is expanded by default: *Fully collapsed* / *Expand to level 2* / *Expand to level 3* / *Fully expanded* (default). You can still expand or collapse any tag by hand; changing this setting resets those manual changes. |
 
 **Desktop and mobile.** The *Notes list* and *Sidebar* settings have two independent values: one for the desktop app and one for the Obsidian mobile app (phone and tablet). The settings tab shows each setting once, and changing it only affects the kind of device you're on, as a note at the top of the *Notes list* group reminds you. So to change the mobile values, open the settings from your phone or tablet. Both sets are saved in the plugin's settings file and synced with your vault, so changing one never overwrites the other. When upgrading from a version without this split, your existing values are copied to both sets.
+
+## Preview break
+
+Write `<!-- more -->` in a note (on its own line, or in the middle of one) to make the list show only what comes before it, followed by "…". It's an HTML comment, so it stays invisible when you read the note in Obsidian. Only the first one counts, and one inside a code block is ignored.
+
+How it combines with the other options, from strongest to weakest:
+
+1. The note's own `content-display` property: `full` shows the whole note, marker or not; `preview` cuts at the marker, or at *Preview length* if there's none.
+2. The `<!-- more -->` marker: the note is cut there even when *Content display* is set to *Full*, and *Preview length* doesn't apply.
+3. The *Content display* and *Preview length* settings.
 
 ## Customizing font sizes
 

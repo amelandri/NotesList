@@ -4,12 +4,65 @@ import {
 	dateGroupLabel,
 	findUnbreakableBlocks,
 	isUniqueNoteName,
+	cutAtPreviewMarker,
 	parseDatetime,
+	previewBody,
 	stripFrontmatter,
 	stripInlineTags,
 	truncateMarkdown,
 	uniqueTags,
 } from "../src/view";
+
+describe("cutAtPreviewMarker", () => {
+	it("cuts at a marker on its own line, with the ellipsis on its own paragraph", () => {
+		expect(cutAtPreviewMarker("Intro.\n\n<!-- more -->\n\nThe rest.")).toBe("Intro.\n\n…");
+	});
+
+	it("cuts at a mid-line marker, with the ellipsis inline", () => {
+		expect(cutAtPreviewMarker("Intro <!--more--> the rest.")).toBe("Intro …");
+	});
+
+	it("adds no ellipsis when nothing follows the marker", () => {
+		expect(cutAtPreviewMarker("Whole note.\n<!-- more -->\n")).toBe("Whole note.");
+	});
+
+	it("cuts at the first marker only", () => {
+		expect(cutAtPreviewMarker("A\n<!-- more -->\nB\n<!-- more -->\nC")).toBe("A\n\n…");
+	});
+
+	it("ignores a marker inside a fenced code block", () => {
+		const text = "```html\n<!-- more -->\n```\nafter";
+		expect(cutAtPreviewMarker(text)).toBeNull();
+	});
+
+	it("returns null without a marker, and doesn't take '-----' for one", () => {
+		expect(cutAtPreviewMarker("Text\n\n-----\n\nMore")).toBeNull();
+	});
+});
+
+describe("previewBody", () => {
+	const marked = "Intro.\n\n<!-- more -->\n\n" + "x".repeat(50);
+	const long = "y".repeat(50);
+
+	it("frontmatter 'full' shows everything, marker or not", () => {
+		expect(previewBody(marked, "full", "preview", 10)).toBe(marked);
+	});
+
+	it("frontmatter 'preview' cuts at the marker, else at the preview length", () => {
+		expect(previewBody(marked, "preview", "full", 10)).toBe("Intro.\n\n…");
+		expect(previewBody(long, "preview", "full", 10)).toBe("y".repeat(10) + "…");
+	});
+
+	it("a marker cuts there even when the setting is 'full', and wins over the preview length", () => {
+		expect(previewBody(marked, null, "full", 10)).toBe("Intro.\n\n…");
+		expect(previewBody(marked, null, "preview", 3)).toBe("Intro.\n\n…");
+	});
+
+	it("without frontmatter or marker, follows the setting", () => {
+		expect(previewBody(long, null, "full", 10)).toBe(long);
+		expect(previewBody(long, null, "preview", 10)).toBe("y".repeat(10) + "…");
+	});
+});
 
 describe("stripInlineTags", () => {
 	it("removes tags inside a sentence, collapsing the space they leave", () => {

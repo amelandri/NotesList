@@ -184,6 +184,60 @@ export function findUnbreakableBlocks(body: string): Array<[number, number]> {
 // stop that line being a valid closing fence, and onto a table's last row it
 // would end up inside a cell. If the block is the last thing in the body,
 // there's nothing left to cut, so the whole body is returned with no ellipsis.
+// The author's own preview break, WordPress/Hugo style. An HTML comment, so
+// Obsidian's reading view doesn't show it, and it can't collide with real
+// content the way a "-----" (a horizontal rule) would.
+const PREVIEW_MARKER = /<!--\s*more\s*-->/i;
+
+// `body` cut at its first preview marker outside a fenced code block, with an
+// ellipsis when anything follows (inline after a mid-line marker, on its own
+// paragraph after a marker at the start of a line, as truncateMarkdown does).
+// null when there's no marker.
+export function cutAtPreviewMarker(body: string): string | null {
+	let offset = 0;
+	let closingFence: RegExp | null = null;
+	for (const line of body.split("\n")) {
+		if (closingFence) {
+			if (closingFence.test(line)) closingFence = null;
+		} else {
+			const fence = FENCE_OPENING.exec(line);
+			if (fence) {
+				const marker = fence[1];
+				closingFence = new RegExp(`^ {0,3}${marker[0] === "`" ? "`" : "~"}{${marker.length},}\\s*$`);
+			} else {
+				const match = PREVIEW_MARKER.exec(line);
+				if (match) {
+					const before = line.slice(0, match.index);
+					const head = (body.slice(0, offset) + before).trimEnd();
+					const rest = body.slice(offset + match.index + match[0].length);
+					if (rest.trim() === "") return head;
+					return head + (before.trim() === "" ? "\n\n…" : " …");
+				}
+			}
+		}
+		offset += line.length + 1;
+	}
+	return null;
+}
+
+// What a note's body shows in the list, by precedence:
+// 1. its own "content-display" frontmatter: "full" shows everything, "preview"
+//    cuts at the preview marker, or at previewLength when there's none;
+// 2. a preview marker: cut there, whatever the setting says (it's a per-note
+//    choice, like the frontmatter);
+// 3. the Content display setting, cutting at previewLength for "preview".
+export function previewBody(
+	body: string,
+	frontmatterMode: ContentDisplayMode | null,
+	settingMode: ContentDisplayMode,
+	previewLength: number
+): string {
+	if (frontmatterMode === "full") return body;
+	const atMarker = cutAtPreviewMarker(body);
+	if (atMarker !== null) return atMarker;
+	return (frontmatterMode ?? settingMode) === "preview" ? truncateMarkdown(body, previewLength) : body;
+}
+
 export function truncateMarkdown(body: string, maxLength: number): string {
 	if (body.length <= maxLength) return body;
 
@@ -866,10 +920,11 @@ export class NotesListView extends ItemView {
 
 	// The global "Content display" setting, unless a note overrides it with its
 	// own content-display: full/preview frontmatter property.
-	private resolveContentDisplay(fm: Record<string, unknown> | undefined): ContentDisplayMode {
+	// The note's own "content-display" frontmatter override, if it's a valid
+	// mode (see previewBody() for how it ranks against the rest).
+	private contentDisplayOverride(fm: Record<string, unknown> | undefined): ContentDisplayMode | null {
 		const override = fm?.["content-display"];
-		if (override === "full" || override === "preview") return override;
-		return this.plugin.deviceSettings().contentDisplay;
+		return override === "full" || override === "preview" ? override : null;
 	}
 
 	private async togglePin(entry: NoteEntry, file: TFile): Promise<void> {
@@ -971,9 +1026,8 @@ export class NotesListView extends ItemView {
 		// Tags stripped before truncating, so the preview length counts text.
 		let body = stripInlineTags(stripFrontmatter(raw)).trim();
 
-		if (this.resolveContentDisplay(cache?.frontmatter) === "preview") {
-			body = truncateMarkdown(body, this.plugin.deviceSettings().previewLength);
-		}
+		const { contentDisplay, previewLength } = this.plugin.deviceSettings();
+		body = previewBody(body, this.contentDisplayOverride(cache?.frontmatter), contentDisplay, previewLength);
 
 		await MarkdownRenderer.render(this.app, body, contentEl, file.path, this.markdownComponent);
 	}
