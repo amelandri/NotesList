@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The pagination bar shows up to 10 page numbers instead of 5. The single-column (mobile) layout keeps 5, so the bar still fits on one row.
 - Double-clicking a note's file name (when shown) opens the note, like double-clicking its content.
+- The sidebar now starts level with the first item of the notes list (a date group header, or the first note), instead of with the "Notes" title.
 
 ### Fixed
 

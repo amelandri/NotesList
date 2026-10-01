@@ -29,6 +29,12 @@
 	--nl-title-font-size: var(--notes-list-title-font-size, 1em);
 	--nl-date-font-size: var(--notes-list-date-font-size, var(--font-ui-small));
 	--nl-panel-title-font-size: var(--notes-list-panel-title-font-size, var(--h4-size));
+	/* The "Notes" header row's height: its title's line box, or the 24px new
+	   note button if that's taller. Shared by .notes-list-header and the
+	   sidebar's offset, so the two stay aligned whatever the title size is.
+	   Both use it where the font size is the same inherited one, so an em-based
+	   title size resolves identically in each. */
+	--nl-header-height: max(24px, calc(var(--nl-panel-title-font-size) * var(--h4-line-height, 1.3)));
 }
 
 .notes-list-view.is-narrow {
@@ -66,12 +72,20 @@
 	   Sticky against .notes-list-view's own scroll (the whole layout scrolls
 	   as one block, scrollbar included, rather than this column scrolling on
 	   its own), so it stays pinned and fully visible as the notes scroll by.
-	   top matches .notes-list-layout's padding-top: the panel already sits
-	   there before any scrolling, so it locks in place immediately instead of
-	   sliding up by that amount before catching. */
+	   top matches where the panel already sits before any scrolling (see
+	   below), so it locks in place immediately instead of sliding up first. */
 	flex: 0 0 auto;
 	position: sticky;
-	top: var(--size-4-4);
+	/* Starts level with the list's first item (a date group header or a note),
+	   not with the "Notes" header row: shifted down by exactly that row plus
+	   its margin. `top` is the same position (the layout's padding plus that
+	   offset), so the panel never moves at all while the list scrolls; a
+	   smaller `top` would let it slide up by the difference before sticking.
+	   In the narrow layout the panel is display: contents, where neither has
+	   any effect. */
+	--nl-sidebar-offset: calc(var(--nl-header-height) + var(--size-4-2));
+	margin-top: var(--nl-sidebar-offset);
+	top: calc(var(--size-4-4) + var(--nl-sidebar-offset));
 }
 
 /* Two classes, to win over Obsidian's own `h4 { font-size: var(--h4-size) }`
@@ -81,11 +95,14 @@
 	font-size: var(--nl-panel-title-font-size);
 }
 
+/* An explicit height (see --nl-header-height), so the sidebar can be offset
+   by exactly the same amount and line up with the list below this row. */
 .notes-list-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--size-4-2);
+	height: var(--nl-header-height);
 	margin-bottom: var(--size-4-2);
 }
 
