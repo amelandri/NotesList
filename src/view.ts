@@ -5,6 +5,7 @@ import {
 	EventRef,
 	ItemView,
 	MarkdownRenderer,
+	Notice,
 	Scope,
 	TFile,
 	WorkspaceLeaf,
@@ -22,6 +23,14 @@ import {
 	UNTAGGED,
 	type TagFilter,
 } from "./tagTree";
+import {
+	countTasks,
+	noteMatchesTaskFilter,
+	setTaskLineChecked,
+	TASK_FILTERS,
+	type TaskCounts,
+	type TaskFilter,
+} from "./tasks";
 import { Moment, moment } from "./moment";
 import { SearchIndex, parseSearchQuery } from "./searchIndex";
 
@@ -40,6 +49,7 @@ interface NoteEntry {
 	date: Moment;
 	tags: string[];
 	pinned: boolean;
+	tasks: TaskCounts;
 }
 
 // Deliberately does NOT use metadataCache.getFileCache(file)?.frontmatterPosition
@@ -341,6 +351,10 @@ export class NotesListView extends ItemView {
 	// single-column (narrow) layout, where an expanded tree would push the
 	// notes list off screen; the two-column layout always shows it.
 	private tagPanelCollapsed = true;
+	// The Tasks section's filter (see tasks.ts), and its own narrow-layout
+	// fold, both working like their Tags counterparts.
+	private selectedTaskFilter: TaskFilter | null = null;
+	private taskPanelCollapsed = true;
 	private currentPage = 1;
 	// Full-text search (see searchIndex.ts). searchQuery is the submitted text
 	// (also what the input shows after a re-render, since render() rebuilds
@@ -554,6 +568,7 @@ export class NotesListView extends ItemView {
 				date: this.resolveDate(file, cache),
 				tags: cache ? getAllTags(cache) ?? [] : [],
 				pinned: cache?.frontmatter?.pinned === true,
+				tasks: countTasks(cache?.listItems),
 			};
 		});
 		this.cachedEntries.sort((a, b) => b.date.valueOf() - a.date.valueOf());
@@ -575,10 +590,11 @@ export class NotesListView extends ItemView {
 
 		const filteredEntries = allEntries.filter((entry) => {
 			const matchesTag = !this.selectedTag || noteMatchesTagFilter(entry.tags, this.selectedTag);
+			const matchesTasks = !this.selectedTaskFilter || noteMatchesTaskFilter(entry.tasks, this.selectedTaskFilter);
 			const matchesDate = !this.selectedDate || entry.date.format("YYYY-MM-DD") === this.selectedDate;
 			const matchesMonth = !this.selectedMonth || entry.date.format("YYYY-MM") === this.selectedMonth;
 			const matchesSearch = !this.searchMatches || this.searchMatches.has(entry.file.path);
-			return matchesTag && matchesDate && matchesMonth && matchesSearch;
+			return matchesTag && matchesTasks && matchesDate && matchesMonth && matchesSearch;
 		});
 
 		// Pinned notes float to the top, each group still newest-first: allEntries
@@ -705,7 +721,9 @@ export class NotesListView extends ItemView {
 		// reserved and the Tags section below never shifts when a filter is
 		// toggled on/off. When nothing is selected, that placeholder pill is
 		// just hidden via CSS (.is-empty) rather than left out of the DOM.
-		const hasActiveFilter = Boolean(this.selectedTag || this.selectedDate || this.selectedMonth || this.searchMatches);
+		const hasActiveFilter = Boolean(
+			this.selectedTag || this.selectedTaskFilter || this.selectedDate || this.selectedMonth || this.searchMatches
+		);
 		const activeFilters = heatmapPanel.createDiv({ cls: "notes-list-active-filters" });
 		activeFilters.toggleClass("is-empty", !hasActiveFilter);
 
@@ -717,6 +735,15 @@ export class NotesListView extends ItemView {
 			const tagLabel = this.selectedTag === UNTAGGED ? "Untagged" : `#${this.selectedTag}`;
 			this.renderFilterPill(activeFilters, tagLabel, "Clear tag filter", () => {
 				this.selectedTag = null;
+				this.currentPage = 1;
+				void this.render();
+			});
+		}
+
+		if (this.selectedTaskFilter) {
+			const taskFilter = TASK_FILTERS.find((t) => t.filter === this.selectedTaskFilter);
+			this.renderFilterPill(activeFilters, `Tasks: ${taskFilter?.label.toLowerCase() ?? ""}`, "Clear tasks filter", () => {
+				this.selectedTaskFilter = null;
 				this.currentPage = 1;
 				void this.render();
 			});
@@ -790,6 +817,8 @@ export class NotesListView extends ItemView {
 			}
 		);
 
+		this.renderTaskPanel(heatmapPanel, allEntries);
+
 		if (keepScroll) container.scrollTop = previousScrollTop;
 
 		await Promise.all(noteRenders);
@@ -797,6 +826,97 @@ export class NotesListView extends ItemView {
 		// Content is in: release the held height. The position stays, unless the
 		// list is now genuinely shorter, in which case it settles at the end.
 		if (keepScroll) layout.setCssStyles({ minHeight: "" });
+	}
+
+	// Writes a checkbox click in a rendered note body back to the note: the
+	// renderer draws working checkboxes, but persisting them is up to whoever
+	// hosts the output (Obsidian's reading view does its own). The n-th
+	// checkbox rendered is the n-th task in the file: the list shows the note's
+	// beginning (a preview only cuts the end) and stripInlineTags() never drops
+	// a task line, so the rendered tasks are always a prefix of the note's,
+	// whose lines metadataCache already knows. Checkboxes inside an embedded
+	// note belong to another file, so they're left out of the count and
+	// clicking them does nothing. The line is checked to still be a task before
+	// writing; otherwise nothing is written and the click is undone. Toggling
+	// never changes the number of lines, so positions stay valid across clicks
+	// even before the cache catches up. The write's own vault events refresh
+	// the list (keeping its scroll position) and the task counts.
+	private async toggleTask(file: TFile, contentEl: HTMLElement, checkbox: HTMLInputElement): Promise<void> {
+		const checked = checkbox.checked;
+		const undo = () => {
+			checkbox.checked = !checked;
+		};
+		if (checkbox.closest(".internal-embed")) {
+			undo();
+			return;
+		}
+
+		const ownCheckboxes = Array.from(contentEl.querySelectorAll("input.task-list-item-checkbox")).filter(
+			(el) => !el.closest(".internal-embed")
+		);
+		const index = ownCheckboxes.indexOf(checkbox);
+		const taskLines = (this.app.metadataCache.getFileCache(file)?.listItems ?? [])
+			.filter((item) => item.task !== undefined)
+			.map((item) => item.position.start.line)
+			.sort((a, b) => a - b);
+		const line = taskLines[index];
+		if (index === -1 || line === undefined) {
+			undo();
+			return;
+		}
+
+		let written = false;
+		try {
+			await this.app.vault.process(file, (data) => {
+				const lines = data.split("\n");
+				const updated = lines[line] === undefined ? null : setTaskLineChecked(lines[line], checked);
+				if (updated === null) return data;
+				lines[line] = updated;
+				written = true;
+				return lines.join("\n");
+			});
+		} catch (error) {
+			console.error("Notes List: could not update the task", error);
+		}
+		if (!written) {
+			undo();
+			new Notice("Couldn't update the task: the note has changed. Try again in a moment.");
+		}
+	}
+
+	// The Tasks section, below Tags. It reuses the tag tree's classes on purpose
+	// (panel, header, rows, labels, counts), so it looks the same and gets the
+	// same narrow-layout folding from styles.css, with notes-task-panel as an
+	// extra hook. Counts span every note in scope, like the tag counts.
+	private renderTaskPanel(container: HTMLElement, allEntries: NoteEntry[]): void {
+		const panel = container.createDiv({ cls: "notes-tag-tree-panel notes-task-panel" });
+		panel.toggleClass("is-collapsed", this.taskPanelCollapsed);
+		const header = panel.createDiv({ cls: "notes-tag-tree-header" });
+		header.createEl("h4", { text: "Tasks", cls: "notes-list-panel-title" });
+		setIcon(header.createSpan({ cls: "notes-tag-tree-header-toggle" }), "chevron-down");
+		header.addEventListener("click", () => {
+			if (!this.isNarrowLayout()) return;
+			this.taskPanelCollapsed = !this.taskPanelCollapsed;
+			void this.render();
+		});
+
+		const list = panel.createDiv({ cls: "notes-tag-tree" }).createEl("ul", { cls: "notes-tag-tree-list" });
+		for (const { filter, label } of TASK_FILTERS) {
+			const count = allEntries.filter((e) => noteMatchesTaskFilter(e.tasks, filter)).length;
+			const row = list.createEl("li", { cls: "notes-tag-tree-item" }).createDiv({ cls: "notes-tag-tree-row" });
+			row.createSpan({ cls: "notes-tag-tree-toggle" });
+			const labelEl = row.createSpan({
+				cls: "notes-tag-tree-label" + (filter === this.selectedTaskFilter ? " is-selected" : ""),
+			});
+			labelEl.createSpan({ text: label });
+			labelEl.createSpan({ text: ` (${count})`, cls: "notes-tag-tree-count" });
+			labelEl.addEventListener("click", () => {
+				this.selectedTaskFilter = filter;
+				this.currentPage = 1;
+				this.taskPanelCollapsed = true;
+				void this.render();
+			});
+		}
 	}
 
 	// Runs only on submit (the button, or Enter in the field), never while
@@ -851,11 +971,12 @@ export class NotesListView extends ItemView {
 		const searchPart = this.searchMatches ? `matching "${this.searchQuery}"` : "";
 		const tagPart =
 			this.selectedTag === UNTAGGED ? "without tags" : this.selectedTag ? `tagged #${this.selectedTag}` : "";
+		const taskPart = TASK_FILTERS.find((t) => t.filter === this.selectedTaskFilter)?.emptyMessage ?? "";
 		const datePart = this.selectedDate ? `on ${moment(this.selectedDate).format("D MMM YYYY")}` : "";
 		const monthPart = this.selectedMonth
 			? `in ${moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY")}`
 			: "";
-		const parts = [searchPart, tagPart, datePart, monthPart].filter(Boolean);
+		const parts = [searchPart, tagPart, taskPart, datePart, monthPart].filter(Boolean);
 
 		if (parts.length === 0) return "No notes found in the configured folder.";
 
@@ -961,6 +1082,19 @@ export class NotesListView extends ItemView {
 			openNote(evt);
 		});
 
+		// Completed out of open + completed tasks ("2/5"), cancelled ones left
+		// out of both; only when there's something to count. Pushed right, next
+		// to the pin button, by margin-left: auto (see styles.css).
+		const { open, done } = entry.tasks;
+		if (open + done > 0) {
+			const taskCount = itemHeader.createSpan({
+				cls: "notes-list-task-count",
+				attr: { "aria-label": `${done} of ${open + done} tasks completed` },
+			});
+			setIcon(taskCount.createSpan({ cls: "notes-list-task-count-icon" }), "list-checks");
+			taskCount.createSpan({ text: `${done}/${open + done}` });
+		}
+
 		// "clickable-icon" is Obsidian's own convention for icon-only buttons —
 		// adding it (and using "is-active" for the pinned state, also Obsidian's
 		// own convention) gets the muted/bold-on-hover/accent-when-active states
@@ -997,8 +1131,14 @@ export class NotesListView extends ItemView {
 			// already handles its own way (e.g. an internal link to some other
 			// note, an external URL, or a code block's copy button) — only open on
 			// a double-click that lands on plain body content.
-			if ((evt.target as HTMLElement).closest("a, button")) return;
+			if ((evt.target as HTMLElement).closest("a, button, input")) return;
 			openNote(evt);
+		});
+		contentEl.addEventListener("click", (evt) => {
+			const target = evt.target;
+			if (target instanceof HTMLInputElement && target.matches("input.task-list-item-checkbox")) {
+				void this.toggleTask(file, contentEl, target);
+			}
 		});
 
 		// The note's tags, from the frontmatter and the body alike, in a row of

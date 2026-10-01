@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Each note shows its tags in a row below its content, collected from both the frontmatter `tags` property and the body. Inline tags are removed from the displayed text (except inside code), so they no longer appear as part of it. Clicking a tag filters the list by it.
 - A `<!-- more -->` marker in a note sets exactly where its preview ends. It takes priority over the Content display and Preview length settings, while a note's own `content-display: full` still shows the whole note. See "Preview break" in the README.
+- A "Tasks" section in the sidebar, under the tags, filters the list to notes with any task, with open tasks or with completed tasks, each with a note count. Notes with tasks also show a "completed/total" counter next to the bookmark.
 
 ### Changed
 
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Checking or unchecking a task in the list now saves it to the note. Before, the checkbox changed on screen only.
 - The list keeps its scroll position when it refreshes in the background, for example right after opening a note, instead of jumping back to the top. Changing page, filters or search still starts from the top.
 
 ## [0.2.3] - 2026-09-30

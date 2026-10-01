@@ -260,6 +260,26 @@
 	margin-bottom: var(--size-2-2);
 }
 
+/* "2/5" completed tasks, right-aligned next to the pin button (the header is
+   space-between, so margin-left: auto keeps the two together on the right). */
+.notes-list-task-count {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	margin-left: auto;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.notes-list-task-count-icon {
+	display: flex;
+}
+
+.notes-list-task-count-icon svg {
+	width: 12px;
+	height: 12px;
+}
+
 .notes-list-datetime {
 	font-size: var(--nl-date-font-size);
 	color: var(--text-accent);
