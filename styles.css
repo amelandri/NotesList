@@ -223,7 +223,7 @@
 }
 
 .notes-list-date-group-header {
-	margin: var(--size-4-4) 0 1.5rem;
+	margin: -2rem 0 1.5rem;
 	font-size: var(--font-ui-smaller);
 	font-weight: 600;
 	text-transform: uppercase;
@@ -242,8 +242,8 @@
 }
 
 .notes-list-item {
-	margin-bottom: 1.5rem;
-	padding-bottom: 1.5rem;
+	margin-bottom: 3rem;
+	padding-bottom: 3rem;
 	border-bottom: 1px solid var(--background-modifier-border);
 	/* Obsidian sets `body { user-select: none }` globally and only re-enables
 	   selection on its own reading/editing views — custom ItemViews like this
@@ -286,6 +286,8 @@
 	margin-left: auto;
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
+	letter-spacing: 0.1rem;
+	font-weight: bold;
 }
 
 .notes-list-task-count-icon {
