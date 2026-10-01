@@ -81,8 +81,7 @@
 	   its margin. `top` is the same position (the layout's padding plus that
 	   offset), so the panel never moves at all while the list scrolls; a
 	   smaller `top` would let it slide up by the difference before sticking.
-	   In the narrow layout the panel is display: contents, where neither has
-	   any effect. */
+	   The narrow layout has no panel at all (see there). */
 	--nl-sidebar-offset: calc(var(--nl-header-height) + var(--size-4-2));
 	margin-top: var(--nl-sidebar-offset);
 	top: calc(var(--size-4-4) + var(--nl-sidebar-offset));
@@ -529,11 +528,12 @@
 }
 
 /* --- Single-column layout (.is-narrow, set from view.ts by pane width) ---
-   The sidebar stops generating a box of its own (display: contents), so its
-   blocks become items of the layout column alongside the notes list, and
-   `order` puts them as: search, heatmap, active filters, tags, notes. That
-   also drops the sidebar's sticky positioning, which would pin the heatmap
-   over the list on a small screen. */
+   There's no sidebar column here: render() puts the sidebar's blocks straight
+   into the layout column alongside the notes list (not display: contents,
+   which the community review flags as partially supported), and `order`
+   puts them as: search, heatmap, active filters, tags, tasks, notes. With no
+   sidebar box there's no sticky positioning either, which would pin the
+   heatmap over the list on a small screen. */
 .notes-list-view.is-narrow .notes-list-layout {
 	flex-direction: column;
 	align-items: stretch;
@@ -543,12 +543,7 @@
 	padding: 0;
 }
 
-.notes-list-view.is-narrow .notes-list-heatmap-panel {
-	display: contents;
-}
-
-.notes-list-view.is-narrow .notes-list-layout > *,
-.notes-list-view.is-narrow .notes-list-heatmap-panel > * {
+.notes-list-view.is-narrow .notes-list-layout > * {
 	flex: none;
 	margin-top: 0;
 	margin-bottom: 0;

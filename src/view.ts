@@ -617,6 +617,12 @@ export class NotesListView extends ItemView {
 		const previousHeight = container.scrollHeight;
 		container.empty();
 		container.addClass("notes-list-view");
+		// Set here as well as by the ResizeObserver, so the CSS always matches
+		// the structure this pass builds (see `sidebar` below), first pass
+		// included; the observer then only re-renders when the threshold is
+		// actually crossed.
+		const narrow = this.isNarrowLayout();
+		container.toggleClass("is-narrow", narrow);
 
 		const layout = container.createDiv({ cls: "notes-list-layout" });
 		// Holds the previous height while the note bodies fill in (they render
@@ -624,7 +630,12 @@ export class NotesListView extends ItemView {
 		// to keep the old scroll position, and the browser would clamp it.
 		if (keepScroll) layout.setCssStyles({ minHeight: `${previousHeight}px` });
 		const mainEl = layout.createDiv({ cls: "notes-list-main" });
-		const heatmapPanel = layout.createDiv({ cls: "notes-list-heatmap-panel" });
+		// Where the sidebar's blocks (search, heatmap, filters, tags, tasks) go:
+		// their own column, or, in the narrow layout, straight into the layout
+		// column next to the notes, where CSS `order` sequences them. Choosing
+		// the parent here replaces a `display: contents` sidebar, which the
+		// community review flags as only partially supported.
+		const sidebar = narrow ? layout : layout.createDiv({ cls: "notes-list-heatmap-panel" });
 
 		mainEl.toggleClass("is-readable-line-width", this.isReadableLineWidthEnabled());
 
@@ -691,9 +702,9 @@ export class NotesListView extends ItemView {
 			this.renderPagination(mainEl, totalPages);
 		}
 
-		this.renderSearchForm(heatmapPanel, searchFocus);
+		this.renderSearchForm(sidebar, searchFocus);
 
-		const activityPanel = heatmapPanel.createDiv({ cls: "notes-list-activity" });
+		const activityPanel = sidebar.createDiv({ cls: "notes-list-activity" });
 		activityPanel.createEl("h4", { text: "Activity", cls: "notes-list-panel-title" });
 		const heatmapSelection: HeatmapSelection = {
 			selectedDate: this.selectedDate,
@@ -724,7 +735,7 @@ export class NotesListView extends ItemView {
 		const hasActiveFilter = Boolean(
 			this.selectedTag || this.selectedTaskFilter || this.selectedDate || this.selectedMonth || this.searchMatches
 		);
-		const activeFilters = heatmapPanel.createDiv({ cls: "notes-list-active-filters" });
+		const activeFilters = sidebar.createDiv({ cls: "notes-list-active-filters" });
 		activeFilters.toggleClass("is-empty", !hasActiveFilter);
 
 		if (this.searchMatches) {
@@ -779,7 +790,7 @@ export class NotesListView extends ItemView {
 			this.renderFilterPill(activeFilters, "placeholder", "", () => {});
 		}
 
-		const tagPanel = heatmapPanel.createDiv({ cls: "notes-tag-tree-panel" });
+		const tagPanel = sidebar.createDiv({ cls: "notes-tag-tree-panel" });
 		tagPanel.toggleClass("is-collapsed", this.tagPanelCollapsed);
 		// A disclosure toggle only in the narrow layout (the chevron is hidden
 		// and clicks are ignored otherwise, see styles.css).
@@ -817,7 +828,7 @@ export class NotesListView extends ItemView {
 			}
 		);
 
-		this.renderTaskPanel(heatmapPanel, allEntries);
+		this.renderTaskPanel(sidebar, allEntries);
 
 		if (keepScroll) container.scrollTop = previousScrollTop;
 
