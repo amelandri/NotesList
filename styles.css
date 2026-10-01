@@ -629,6 +629,12 @@
 	padding-bottom: 1.5rem;
 }
 
+/* No negative top margin on date group headers here: in two columns it pulls
+   a header up into the previous note's larger bottom spacing (3rem). */
+.notes-list-view.is-narrow .notes-list-date-group-header {
+	margin-top: 0;
+}
+
 /* The filter sections (Tags, Tasks; see renderFilterSections() in view.ts):
    their foldable headers side by side, half the width each, and the content
    of an open one below them at full width. Collapsed by default. */
