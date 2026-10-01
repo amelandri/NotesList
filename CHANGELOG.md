@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_No unreleased changes yet._
+
+## [0.2.4] - 2026-10-01
+
 ### Added
 
 - Each note shows its tags in a row below its content, collected from both the frontmatter `tags` property and the body. Inline tags are removed from the displayed text (except inside code), so they no longer appear as part of it. Clicking a tag filters the list by it.
@@ -132,7 +136,8 @@ Initial release.
 - Double-clicking a note's content opens the note.
 - The notes column follows Obsidian's "Readable line length" setting.
 
-[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.3...HEAD
+[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.4...HEAD
+[0.2.4]: https://github.com/amelandri/NotesList/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/amelandri/NotesList/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/amelandri/NotesList/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/amelandri/NotesList/compare/0.2.0...0.2.1
