@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The pagination bar shows up to 10 page numbers instead of 5. The single-column (mobile) layout keeps 5, so the bar still fits on one row.
 - Double-clicking a note's file name (when shown) opens the note, like double-clicking its content.
 
+### Fixed
+
+- The list keeps its scroll position when it refreshes in the background, for example right after opening a note, instead of jumping back to the top. Changing page, filters or search still starts from the top.
+
 ## [0.2.3] - 2026-09-30
 
 ### Added

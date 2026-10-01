@@ -365,7 +365,7 @@ export class NotesListView extends ItemView {
 			const narrow = this.isNarrowLayout();
 			if (narrow === this.contentEl.hasClass("is-narrow")) return;
 			this.contentEl.toggleClass("is-narrow", narrow);
-			void this.render();
+			void this.render({ keepScroll: true });
 		});
 		resizeObserver.observe(this.contentEl);
 		this.register(() => resizeObserver.disconnect());
@@ -373,7 +373,7 @@ export class NotesListView extends ItemView {
 			internalVault(this.app).on("config-changed", (key) => {
 				// Only affects the is-readable-line-width CSS class — no need to
 				// rescan every note in scope for a purely visual toggle.
-				if (key === "readableLineLength") void this.render();
+				if (key === "readableLineLength") void this.render({ keepScroll: true });
 			})
 		);
 		await this.refresh();
@@ -455,7 +455,7 @@ export class NotesListView extends ItemView {
 			// on it.
 			void this.searchIndex.update(files);
 		}
-		await this.render();
+		await this.render({ keepScroll: true });
 	}
 
 	focusSearch(): void {
@@ -505,7 +505,11 @@ export class NotesListView extends ItemView {
 		this.cachedEntries.sort((a, b) => b.date.valueOf() - a.date.valueOf());
 	}
 
-	private async render(): Promise<void> {
+	// keepScroll: for rebuilds the user didn't navigate into (vault events,
+	// settings, resizes), which must leave the list where it was. Rebuilding
+	// empties contentEl, which would otherwise snap the scroll back to the top.
+	// Navigation (page, filters, search) leaves it off and lands at the top.
+	private async render({ keepScroll = false }: { keepScroll?: boolean } = {}): Promise<void> {
 		// Unload whatever the *previous* render() pass registered against its
 		// now-discarded DOM (see the field comment above) before this pass's
 		// renderEntry() calls start registering against a fresh one.
@@ -539,10 +543,16 @@ export class NotesListView extends ItemView {
 				: null;
 
 		const container = this.contentEl;
+		const previousScrollTop = container.scrollTop;
+		const previousHeight = container.scrollHeight;
 		container.empty();
 		container.addClass("notes-list-view");
 
 		const layout = container.createDiv({ cls: "notes-list-layout" });
+		// Holds the previous height while the note bodies fill in (they render
+		// asynchronously, below): without it the list would briefly be too short
+		// to keep the old scroll position, and the browser would clamp it.
+		if (keepScroll) layout.setCssStyles({ minHeight: `${previousHeight}px` });
 		const mainEl = layout.createDiv({ cls: "notes-list-main" });
 		const heatmapPanel = layout.createDiv({ cls: "notes-list-heatmap-panel" });
 
@@ -726,7 +736,13 @@ export class NotesListView extends ItemView {
 			}
 		);
 
+		if (keepScroll) container.scrollTop = previousScrollTop;
+
 		await Promise.all(noteRenders);
+
+		// Content is in: release the held height. The position stays, unless the
+		// list is now genuinely shorter, in which case it settles at the end.
+		if (keepScroll) layout.setCssStyles({ minHeight: "" });
 	}
 
 	// Runs only on submit (the button, or Enter in the field), never while
