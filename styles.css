@@ -317,6 +317,15 @@
 	margin-bottom: 0;
 }
 
+/* A note's tags (frontmatter and inline alike), below its content. Each is an
+   a.tag, Obsidian's own tag pill, so it looks like a tag in reading view. */
+.notes-list-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-2-2);
+	margin-top: var(--size-4-5);
+}
+
 .notes-list-empty {
 	color: var(--text-muted);
 	font-style: italic;

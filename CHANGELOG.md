@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Each note shows its tags in a row below its content, collected from both the frontmatter `tags` property and the body. Inline tags are removed from the displayed text (except inside code), so they no longer appear as part of it. Clicking a tag filters the list by it.
+
 ### Changed
 
 - The pagination bar shows up to 10 page numbers instead of 5. The single-column (mobile) layout keeps 5, so the bar still fits on one row.

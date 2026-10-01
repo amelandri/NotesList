@@ -1,6 +1,53 @@
 import moment from "moment";
 import { describe, expect, it } from "vitest";
-import { dateGroupLabel, findUnbreakableBlocks, isUniqueNoteName, parseDatetime, stripFrontmatter, truncateMarkdown } from "../src/view";
+import {
+	dateGroupLabel,
+	findUnbreakableBlocks,
+	isUniqueNoteName,
+	parseDatetime,
+	stripFrontmatter,
+	stripInlineTags,
+	truncateMarkdown,
+	uniqueTags,
+} from "../src/view";
+
+describe("stripInlineTags", () => {
+	it("removes tags inside a sentence, collapsing the space they leave", () => {
+		expect(stripInlineTags("Met the team #work today")).toBe("Met the team today");
+	});
+
+	it("removes nested tags and tags at the start or end of a line", () => {
+		expect(stripInlineTags("#area/work/meetings notes #idea")).toBe("notes");
+	});
+
+	it("drops a line that held nothing but tags", () => {
+		expect(stripInlineTags("First paragraph.\n\n#journal #daily\n\nSecond.")).toBe("First paragraph.\n\n\nSecond.");
+	});
+
+	it("keeps a list item's marker and indentation", () => {
+		expect(stripInlineTags("  - buy milk #todo")).toBe("  - buy milk");
+	});
+
+	it("leaves headings, links with anchors, escaped hashes and numbers alone", () => {
+		const text = "# Heading\nSee [[Note#Section]] and https://x.com/#a, \\#notatag, issue #123";
+		expect(stripInlineTags(text)).toBe(text);
+	});
+
+	it("leaves tags inside inline code and fenced code blocks alone", () => {
+		const text = "Use `#tag` here #real\n```\n#notatag\n```\nafter #x";
+		expect(stripInlineTags(text)).toBe("Use `#tag` here\n```\n#notatag\n```\nafter");
+	});
+
+	it("handles non-ASCII letters", () => {
+		expect(stripInlineTags("Oggi #attività fatta")).toBe("Oggi fatta");
+	});
+});
+
+describe("uniqueTags", () => {
+	it("dedupes case-insensitively, keeping the first-seen casing and order", () => {
+		expect(uniqueTags(["#Project", "#idea", "#project", "#idea"])).toEqual(["#Project", "#idea"]);
+	});
+});
 
 describe("parseDatetime", () => {
 	it("parses a quoted string with seconds at face value, in local time", () => {

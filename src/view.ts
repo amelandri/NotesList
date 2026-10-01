@@ -71,6 +71,71 @@ export function stripFrontmatter(raw: string): string {
 const TABLE_DELIMITER_ROW = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
 const FENCE_OPENING = /^ {0,3}(`{3,}|~{3,})/;
 
+// An inline tag, as Obsidian recognizes one: "#" at the start of a line or
+// after whitespace (so "Note#heading" links, URLs' "#anchor" and an escaped
+// "\#" don't count), then letters, digits, "_", "-" or "/", with at least one
+// character that isn't a digit ("#123" is not a tag). "# Heading" doesn't
+// match either, since a space can't follow the "#".
+const INLINE_TAG = /(^|\s)#(?=[\p{L}\p{N}_\-/]*[\p{L}_\-/])[\p{L}\p{N}_\-/]+/gu;
+// An inline code span (`code`, ``co`de``), whose content is never a tag.
+const INLINE_CODE = /(`+)[^`]*?\1/g;
+
+// `body` with its inline tags removed, since the list shows a note's tags in a
+// row of their own instead (see renderEntry()). Fenced code blocks and inline
+// code are left untouched, as Obsidian doesn't read tags there either. Spaces
+// a removed tag leaves behind are collapsed (keeping the line's indentation),
+// and a line that held nothing but tags is dropped altogether.
+export function stripInlineTags(body: string): string {
+	const out: string[] = [];
+	let closingFence: RegExp | null = null;
+	for (const line of body.split("\n")) {
+		if (closingFence) {
+			if (closingFence.test(line)) closingFence = null;
+			out.push(line);
+			continue;
+		}
+		const fence = FENCE_OPENING.exec(line);
+		if (fence) {
+			const marker = fence[1];
+			closingFence = new RegExp(`^ {0,3}${marker[0] === "`" ? "`" : "~"}{${marker.length},}\\s*$`);
+			out.push(line);
+			continue;
+		}
+
+		// Strip tags only from the stretches between inline code spans.
+		let stripped = "";
+		let last = 0;
+		for (const code of line.matchAll(INLINE_CODE)) {
+			stripped += line.slice(last, code.index).replace(INLINE_TAG, "$1") + code[0];
+			last = code.index + code[0].length;
+		}
+		stripped += line.slice(last).replace(INLINE_TAG, "$1");
+		if (stripped === line) {
+			out.push(line);
+			continue;
+		}
+
+		// Indentation from the original line: a tag removed from the very start
+		// leaves its trailing space behind, which isn't indentation.
+		const indent = /^\s*/.exec(line)?.[0] ?? "";
+		const rest = stripped.trim().replace(/ {2,}/g, " ");
+		if (rest) out.push(indent + rest);
+	}
+	return out.join("\n");
+}
+
+// A note's tags (frontmatter "tags" plus inline ones, as getAllTags() returns
+// them, "#"-prefixed and once per occurrence) deduplicated case-insensitively,
+// keeping each tag's first-seen casing and order, like the tag tree does.
+export function uniqueTags(tags: string[]): string[] {
+	const seen = new Map<string, string>();
+	for (const tag of tags) {
+		const key = tag.toLowerCase();
+		if (!seen.has(key)) seen.set(key, tag);
+	}
+	return [...seen.values()];
+}
+
 // [start, end) character ranges of every fenced code block and table in
 // `body` — Markdown that renders as garbage (an unclosed fence swallowing the
 // rest of the preview, a table with a half-row) if cut partway through.
@@ -864,9 +929,31 @@ export class NotesListView extends ItemView {
 			if ((evt.target as HTMLElement).closest("a, button")) return;
 			openNote(evt);
 		});
+
+		// The note's tags, from the frontmatter and the body alike, in a row of
+		// their own below the content (the body's inline tags are stripped from
+		// the text below). Created before the first await so it stays in place
+		// after the content. Clicking one filters the list by it, like the tag
+		// tree. "tag" is Obsidian's own class for a rendered tag pill.
+		const tags = uniqueTags(entry.tags);
+		if (tags.length > 0) {
+			const tagRow = item.createDiv({ cls: "notes-list-tags" });
+			for (const tag of tags) {
+				const tagEl = tagRow.createEl("a", { text: tag, cls: "tag", href: tag });
+				tagEl.addEventListener("click", (evt) => {
+					evt.preventDefault();
+					this.selectedTag = tag.replace(/^#/, "");
+					this.currentPage = 1;
+					this.tagPanelCollapsed = true;
+					void this.render();
+				});
+			}
+		}
+
 		const raw = await this.app.vault.cachedRead(file);
 		const cache = this.app.metadataCache.getFileCache(file);
-		let body = stripFrontmatter(raw).trim();
+		// Tags stripped before truncating, so the preview length counts text.
+		let body = stripInlineTags(stripFrontmatter(raw)).trim();
 
 		if (this.resolveContentDisplay(cache?.frontmatter) === "preview") {
 			body = truncateMarkdown(body, this.plugin.deviceSettings().previewLength);
