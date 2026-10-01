@@ -595,7 +595,7 @@
 .notes-list-view.is-narrow .notes-list-search { order: 1; }
 .notes-list-view.is-narrow .notes-list-activity { order: 2; }
 .notes-list-view.is-narrow .notes-list-active-filters { order: 3; }
-.notes-list-view.is-narrow .notes-tag-tree-panel { order: 4; }
+.notes-list-view.is-narrow .notes-list-filter-sections { order: 4; }
 .notes-list-view.is-narrow .notes-list-main { order: 5; }
 
 /* The heatmap fills the column's width: the week columns (and the month
@@ -622,8 +622,36 @@
 	display: none;
 }
 
-/* The Tags section becomes a disclosure: a full-width header row that folds
-   the tree away, collapsed by default. */
+/* Notes sit closer together on a small screen than in two columns. Pinned
+   notes keep their own boxed spacing (.is-pinned). */
+.notes-list-view.is-narrow .notes-list-item:not(.is-pinned) {
+	margin-bottom: 1.5rem;
+	padding-bottom: 1.5rem;
+}
+
+/* The filter sections (Tags, Tasks; see renderFilterSections() in view.ts):
+   their foldable headers side by side, half the width each, and the content
+   of an open one below them at full width. Collapsed by default. */
+.notes-list-view.is-narrow .notes-list-filter-sections {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--size-4-2);
+}
+
+.notes-list-view.is-narrow .notes-list-filter-sections > .notes-tag-tree-panel {
+	margin: 0;
+	min-width: 0;
+}
+
+.notes-list-view.is-narrow .notes-filter-section-content {
+	grid-column: 1 / -1;
+}
+
+/* An open section's header, marked so it's clear whose content is below. */
+.notes-list-view.is-narrow .notes-filter-section-header:not(.is-collapsed) {
+	border-color: var(--interactive-accent);
+}
+
 .notes-list-view.is-narrow .notes-tag-tree-panel {
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
@@ -656,13 +684,6 @@
 	transform: rotate(-90deg);
 }
 
-.notes-list-view.is-narrow .notes-tag-tree {
-	margin-top: var(--size-4-2);
-}
-
-.notes-list-view.is-narrow .notes-tag-tree-panel.is-collapsed .notes-tag-tree {
-	display: none;
-}
 
 .notes-tag-tree-empty {
 	color: var(--text-muted);

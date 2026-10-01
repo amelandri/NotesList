@@ -790,45 +790,46 @@ export class NotesListView extends ItemView {
 			this.renderFilterPill(activeFilters, "placeholder", "", () => {});
 		}
 
-		const tagPanel = sidebar.createDiv({ cls: "notes-tag-tree-panel" });
-		tagPanel.toggleClass("is-collapsed", this.tagPanelCollapsed);
-		// A disclosure toggle only in the narrow layout (the chevron is hidden
-		// and clicks are ignored otherwise, see styles.css).
-		const tagHeader = tagPanel.createDiv({ cls: "notes-tag-tree-header" });
-		tagHeader.createEl("h4", { text: "Tags", cls: "notes-list-panel-title" });
-		setIcon(tagHeader.createSpan({ cls: "notes-tag-tree-header-toggle" }), "chevron-down");
-		tagHeader.addEventListener("click", () => {
-			if (!this.isNarrowLayout()) return;
-			this.tagPanelCollapsed = !this.tagPanelCollapsed;
-			void this.render();
-		});
-		const tagTree = buildTagTree(allEntries.map((e) => e.tags));
 		const expandLevel = this.plugin.deviceSettings().tagTreeExpandLevel;
 		if (expandLevel !== this.appliedTagTreeExpandLevel) {
 			this.tagCollapseOverrides.clear();
 			this.appliedTagTreeExpandLevel = expandLevel;
 		}
-		renderTagTree(
-			tagPanel.createDiv({ cls: "notes-tag-tree" }),
-			tagTree,
-			allEntries.filter((e) => e.tags.length === 0).length,
-			this.selectedTag,
-			(path, depth) => this.tagCollapseOverrides.get(path) ?? isCollapsedByDefault(depth, expandLevel),
-			(filter) => {
-				this.selectedTag = filter;
-				this.currentPage = 1;
-				// Fold the section back in the narrow layout, so the filtered list
-				// is right there; its filter pill stays visible above.
-				this.tagPanelCollapsed = true;
-				void this.render();
+		this.renderFilterSections(sidebar, narrow, [
+			{
+				title: "Tags",
+				cls: "notes-tag-panel",
+				collapsed: this.tagPanelCollapsed,
+				setCollapsed: (collapsed) => (this.tagPanelCollapsed = collapsed),
+				renderContent: (el) =>
+					renderTagTree(
+						el,
+						buildTagTree(allEntries.map((e) => e.tags)),
+						allEntries.filter((e) => e.tags.length === 0).length,
+						this.selectedTag,
+						(path, depth) => this.tagCollapseOverrides.get(path) ?? isCollapsedByDefault(depth, expandLevel),
+						(filter) => {
+							this.selectedTag = filter;
+							this.currentPage = 1;
+							// Fold the section back in the narrow layout, so the filtered
+							// list is right there; its filter pill stays visible above.
+							this.tagPanelCollapsed = true;
+							void this.render();
+						},
+						(path, collapsed) => {
+							this.tagCollapseOverrides.set(path, collapsed);
+							void this.render();
+						}
+					),
 			},
-			(path, collapsed) => {
-				this.tagCollapseOverrides.set(path, collapsed);
-				void this.render();
-			}
-		);
-
-		this.renderTaskPanel(sidebar, allEntries);
+			{
+				title: "Tasks",
+				cls: "notes-task-panel",
+				collapsed: this.taskPanelCollapsed,
+				setCollapsed: (collapsed) => (this.taskPanelCollapsed = collapsed),
+				renderContent: (el) => this.renderTaskFilters(el, allEntries),
+			},
+		]);
 
 		if (keepScroll) container.scrollTop = previousScrollTop;
 
@@ -895,23 +896,63 @@ export class NotesListView extends ItemView {
 		}
 	}
 
-	// The Tasks section, below Tags. It reuses the tag tree's classes on purpose
-	// (panel, header, rows, labels, counts), so it looks the same and gets the
-	// same narrow-layout folding from styles.css, with notes-task-panel as an
-	// extra hook. Counts span every note in scope, like the tag counts.
-	private renderTaskPanel(container: HTMLElement, allEntries: NoteEntry[]): void {
-		const panel = container.createDiv({ cls: "notes-tag-tree-panel notes-task-panel" });
-		panel.toggleClass("is-collapsed", this.taskPanelCollapsed);
-		const header = panel.createDiv({ cls: "notes-tag-tree-header" });
-		header.createEl("h4", { text: "Tasks", cls: "notes-list-panel-title" });
-		setIcon(header.createSpan({ cls: "notes-tag-tree-header-toggle" }), "chevron-down");
-		header.addEventListener("click", () => {
-			if (!this.isNarrowLayout()) return;
-			this.taskPanelCollapsed = !this.taskPanelCollapsed;
-			void this.render();
-		});
+	// The sidebar's filter sections (Tags, Tasks), all built the same way. In
+	// two columns each is one panel, its title above its content. In the
+	// narrow layout the titles become foldable headers side by side, half the
+	// width each, in a two-column grid, and an expanded section's content comes
+	// below them at full width (several stack if several are open). Header and
+	// content are separate elements there, which is why this builds the DOM
+	// per layout rather than leaving it to CSS. Both reuse the tag tree's
+	// panel classes, so they look the same.
+	private renderFilterSections(
+		sidebar: HTMLElement,
+		narrow: boolean,
+		sections: Array<{
+			title: string;
+			cls: string;
+			collapsed: boolean;
+			setCollapsed: (collapsed: boolean) => void;
+			renderContent: (el: HTMLElement) => void;
+		}>
+	): void {
+		const renderTitle = (parent: HTMLElement, title: string) => {
+			const header = parent.createDiv({ cls: "notes-tag-tree-header" });
+			header.createEl("h4", { text: title, cls: "notes-list-panel-title" });
+			return header;
+		};
 
-		const list = panel.createDiv({ cls: "notes-tag-tree" }).createEl("ul", { cls: "notes-tag-tree-list" });
+		if (!narrow) {
+			for (const section of sections) {
+				const panel = sidebar.createDiv({ cls: `notes-tag-tree-panel ${section.cls}` });
+				renderTitle(panel, section.title);
+				section.renderContent(panel.createDiv({ cls: "notes-tag-tree" }));
+			}
+			return;
+		}
+
+		const grid = sidebar.createDiv({ cls: "notes-list-filter-sections" });
+		for (const section of sections) {
+			const box = grid.createDiv({ cls: `notes-tag-tree-panel notes-filter-section-header ${section.cls}` });
+			box.toggleClass("is-collapsed", section.collapsed);
+			const header = renderTitle(box, section.title);
+			setIcon(header.createSpan({ cls: "notes-tag-tree-header-toggle" }), "chevron-down");
+			header.addEventListener("click", () => {
+				section.setCollapsed(!section.collapsed);
+				void this.render();
+			});
+		}
+		for (const section of sections) {
+			if (section.collapsed) continue;
+			const box = grid.createDiv({ cls: `notes-tag-tree-panel notes-filter-section-content ${section.cls}` });
+			section.renderContent(box.createDiv({ cls: "notes-tag-tree" }));
+		}
+	}
+
+	// The Tasks section's content: one entry per TASK_FILTERS choice, with its
+	// note count across every note in scope (like the tag counts), in the tag
+	// tree's row markup.
+	private renderTaskFilters(container: HTMLElement, allEntries: NoteEntry[]): void {
+		const list = container.createEl("ul", { cls: "notes-tag-tree-list" });
 		for (const { filter, label } of TASK_FILTERS) {
 			const count = allEntries.filter((e) => noteMatchesTaskFilter(e.tasks, filter)).length;
 			const row = list.createEl("li", { cls: "notes-tag-tree-item" }).createDiv({ cls: "notes-tag-tree-row" });
