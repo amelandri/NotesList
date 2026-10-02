@@ -1036,14 +1036,20 @@ export class NotesListView extends ItemView {
 		if (totalPages <= 1) return;
 
 		const nav = container.createDiv({ cls: "notes-list-pagination" });
+		// An icon-only jump button. First/previous show only off the first page,
+		// next/last only off the last one, like the old prev/next pair.
+		const jumpButton = (icon: string, label: string, page: number) => {
+			const button = nav.createEl("button", {
+				cls: "notes-list-page-button",
+				attr: { type: "button", "aria-label": label },
+			});
+			setIcon(button, icon);
+			button.addEventListener("click", () => this.goToPage(page));
+		};
 
 		if (this.currentPage > 1) {
-			const prev = nav.createEl("button", {
-				cls: "notes-list-page-button",
-				attr: { type: "button", "aria-label": t("view.previousPage") },
-			});
-			setIcon(prev, "chevron-left");
-			prev.addEventListener("click", () => this.goToPage(this.currentPage - 1));
+			jumpButton("chevrons-left", t("view.firstPage"), 1);
+			jumpButton("chevron-left", t("view.previousPage"), this.currentPage - 1);
 		}
 
 		// Fewer in the single-column layout, where 10 wouldn't fit on one row.
@@ -1062,12 +1068,8 @@ export class NotesListView extends ItemView {
 		}
 
 		if (this.currentPage < totalPages) {
-			const next = nav.createEl("button", {
-				cls: "notes-list-page-button",
-				attr: { type: "button", "aria-label": t("view.nextPage") },
-			});
-			setIcon(next, "chevron-right");
-			next.addEventListener("click", () => this.goToPage(this.currentPage + 1));
+			jumpButton("chevron-right", t("view.nextPage"), this.currentPage + 1);
+			jumpButton("chevrons-right", t("view.lastPage"), totalPages);
 		}
 	}
 
