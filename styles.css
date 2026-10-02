@@ -347,6 +347,16 @@
 	line-height: var(--nl-content-line-height);
 }
 
+/* Task checkboxes, lined up with their text the way Obsidian's reading view
+   does it. Its own rule for this is scoped to .markdown-preview-view (checked
+   in app.css), which this container isn't, so without it the box sat a bit
+   above the text. em-based, so it follows the content font size. */
+.notes-list-content .task-list-item-checkbox {
+	position: relative;
+	top: 0.2em;
+	margin-inline-end: 0.6em;
+}
+
 .notes-list-content > *:first-child {
 	margin-top: 0;
 }
@@ -419,16 +429,26 @@
 .notes-heatmap-months {
 	display: flex;
 	gap: 3px;
-	margin-bottom: var(--size-2-1);
 }
 
+/* Each label is one week column wide (10px) and its month name overflows to
+   the right. The padding grows the click target downwards; it replaces the
+   row's former margin-bottom, so the grid moves down only slightly. */
 .notes-heatmap-month-label {
 	flex: 0 0 10px;
 	width: 10px;
+	padding: 2px 0 var(--size-2-3);
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
 	overflow: visible;
 	white-space: nowrap;
+}
+
+/* The empty labels of the following weeks come later in the DOM, so they sit
+   on top of the overflowing name and used to swallow clicks on all but its
+   first 10px. Letting clicks through them makes the whole name clickable. */
+.notes-heatmap-month-label:not(.is-clickable) {
+	pointer-events: none;
 }
 
 .notes-heatmap-month-label.is-clickable {

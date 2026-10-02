@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - In the single-column layout, date group headers ("Today", "This week"…) no longer overlap the note above them: the negative top margin that tightens the two-column list doesn't apply there.
+- Heatmap month labels are easier to click: the whole month name responds, not just its first letter, and the click area is taller.
+- Task checkboxes in the list line up with their text, as in Obsidian's reading view, instead of sitting slightly above it.
 
 ## [0.2.4] - 2026-10-01
 
