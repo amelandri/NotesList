@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { t } from "./i18n";
 import type { TagTreeExpandLevel } from "./settings";
 
 export interface TagTreeNode {
@@ -105,7 +106,7 @@ export function renderTagTree(
 	container.empty();
 
 	if (root.children.size === 0) {
-		container.createEl("p", { text: "No tags.", cls: "notes-tag-tree-empty" });
+		container.createEl("p", { text: t("tags.none"), cls: "notes-tag-tree-empty" });
 	} else {
 		renderChildren(container, root, 1, selectedPath, isCollapsed, onSelect, onSetCollapsed);
 	}
@@ -119,7 +120,7 @@ export function renderTagTree(
 	const label = row.createSpan({
 		cls: "notes-tag-tree-label" + (selectedPath === UNTAGGED ? " is-selected" : ""),
 	});
-	label.createSpan({ text: "Untagged" });
+	label.createSpan({ text: t("tags.untagged") });
 	label.createSpan({ text: ` (${untaggedCount})`, cls: "notes-tag-tree-count" });
 	label.addEventListener("click", () => onSelect(UNTAGGED));
 }

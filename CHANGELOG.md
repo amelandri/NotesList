@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Italian translation. The plugin follows Obsidian's language setting, and falls back to English for languages it doesn't have yet. Plurals follow each language's own rules, and the "no notes" message now lists the active filters by the same labels as their pills. Heatmap month labels always start with a capital letter, also in languages that write month names in lower case.
+
 ### Changed
 
 - On desktop, the new note button in the notes header is now labeled "New note" next to its "+" icon and uses the accent color. The single-column layout keeps its icon-only button next to search.

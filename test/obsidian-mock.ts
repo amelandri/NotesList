@@ -19,6 +19,11 @@ export { default as moment } from "moment";
 
 export function setIcon() {}
 
+// The app language (i18n.ts); tests switch it with i18n's own setLanguage().
+export function getLanguage() {
+	return "en";
+}
+
 export function getAllTags() {
 	return [];
 }

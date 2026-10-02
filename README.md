@@ -23,6 +23,7 @@ Open the view from the ribbon icon ("Open notes list") or the **Notes List: Open
 - **Pagination** — long lists are split into pages, so browsing stays fast no matter how many notes are in the folder.
 - **New note button** — the "+ New note" button above the list (a "+" next to the search box in the single-column layout) creates a new, uniquely-named note directly in the watched folder in one click, with today's date already set. No other plugin required; optionally starts from a template note of your choice (see Settings below). Also available as the **Create new note** command, so you can assign it your own keyboard shortcut from Settings → Hotkeys — it works even when the Notes List view isn't open.
 - **Works on mobile** — on a phone, or in any pane narrower than 720 px, the view stacks into a single column: search, heatmap, a collapsible Tags section, then the notes. The search button shows just a magnifier icon, with the New Note button right next to it.
+- **Languages** — available in English and Italian, following Obsidian's own language setting (Settings → General → Language); other languages show English. Dates, month names and the first day of the week follow that language too. The settings and labels in this README are the English ones.
 - Respects Obsidian's own "Readable line length" setting, and refreshes automatically as notes in the folder are created, edited, deleted, renamed, or have their frontmatter changed.
 
 ## Installation

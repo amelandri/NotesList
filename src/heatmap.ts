@@ -1,3 +1,4 @@
+import { t, tn } from "./i18n";
 import { Moment, moment } from "./moment";
 
 const WEEKDAYS = 7;
@@ -74,23 +75,25 @@ export function renderHeatmap(
 			const cell = column.createDiv({
 				cls: `notes-heatmap-cell level-${level}` + (dateKey === selectedDate ? " is-selected" : ""),
 			});
-			cell.setAttr("title", `${count} note${count === 1 ? "" : "s"} — ${date.format("D MMM")}`);
+			cell.setAttr("title", tn("heatmap.cell", count, { date: date.format("D MMM") }));
 			cell.addEventListener("click", () => onSelectDate(dateKey));
 		}
 		weekIndex++;
 	}
 
 	const legend = container.createDiv({ cls: "notes-heatmap-legend" });
-	legend.createSpan({ text: "Less" });
+	legend.createSpan({ text: t("heatmap.less") });
 	for (let level = 0; level <= 4; level++) {
 		legend.createDiv({ cls: `notes-heatmap-cell level-${level}` });
 	}
-	legend.createSpan({ text: "More" });
+	legend.createSpan({ text: t("heatmap.more") });
 
 	const total = dates.length;
-	const totalLabel = `${total} note${total === 1 ? "" : "s"}`;
 	legend.createSpan({
-		text: visibleCount === total ? totalLabel : `${visibleCount} of ${totalLabel}`,
+		text:
+			visibleCount === total
+				? tn("heatmap.total", total)
+				: tn("heatmap.totalFiltered", total, { visible: visibleCount }),
 		cls: "notes-heatmap-total",
 	});
 }
@@ -109,10 +112,12 @@ export function monthSpans(weekMonths: number[]): number[] {
 // A month label with a single column of room (the partial first month of
 // the window, or the current month when it has just started) would overlap
 // the next label, so it shrinks to its initial plus a period ("S."). The full
-// name stays in the label's tooltip.
+// name stays in the label's tooltip. Either way the first letter is upper
+// case: some locales write month names in lower case (Italian "giu", "lug"),
+// which looks off as a label.
 export function monthLabelText(shortName: string, span: number): string {
-	if (span > 1) return shortName;
-	return shortName.charAt(0).toLocaleUpperCase() + ".";
+	const initial = shortName.charAt(0).toLocaleUpperCase();
+	return span > 1 ? initial + shortName.slice(1) : initial + ".";
 }
 
 export function levelFor(count: number, maxCount: number): number {

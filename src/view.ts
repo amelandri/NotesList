@@ -31,6 +31,7 @@ import {
 	type TaskCounts,
 	type TaskFilter,
 } from "./tasks";
+import { t, tn } from "./i18n";
 import { Moment, moment } from "./moment";
 import { SearchIndex, parseSearchQuery } from "./searchIndex";
 
@@ -312,10 +313,10 @@ export function parseDatetime(raw: unknown): Moment | null {
 // test happens to run on.
 export function dateGroupLabel(date: Moment, now: Moment = moment()): string {
 	const today = now.clone().startOf("day");
-	if (date.isSameOrAfter(today, "day")) return "Today";
-	if (date.isSame(today.clone().subtract(1, "day"), "day")) return "Yesterday";
-	if (date.isSameOrAfter(today.clone().startOf("week"), "day")) return "This week";
-	return "Older";
+	if (date.isSameOrAfter(today, "day")) return t("group.today");
+	if (date.isSame(today.clone().subtract(1, "day"), "day")) return t("group.yesterday");
+	if (date.isSameOrAfter(today.clone().startOf("week"), "day")) return t("group.thisWeek");
+	return t("group.older");
 }
 
 // "readableLineLength" is an undocumented internal Vault config key with no public
@@ -397,7 +398,7 @@ export class NotesListView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "Notes list";
+		return t("view.title");
 	}
 
 	getIcon(): string {
@@ -641,7 +642,7 @@ export class NotesListView extends ItemView {
 
 		const header = mainEl.createDiv({ cls: "notes-list-header" });
 		const titleGroup = header.createDiv({ cls: "notes-list-header-title-group" });
-		titleGroup.createEl("h4", { text: "Notes", cls: "notes-list-panel-title" });
+		titleGroup.createEl("h4", { text: t("view.notes"), cls: "notes-list-panel-title" });
 
 		// Two columns only: the narrow layout hides it in favor of the icon-only
 		// button next to search (see renderSearchForm()).
@@ -650,7 +651,7 @@ export class NotesListView extends ItemView {
 			attr: { type: "button" },
 		});
 		setIcon(newNoteButton.createSpan({ cls: "notes-list-new-note-button-icon" }), "plus");
-		newNoteButton.createSpan({ text: "New note" });
+		newNoteButton.createSpan({ text: t("view.newNote") });
 		newNoteButton.addEventListener("click", () => void this.plugin.createUniqueNote());
 
 		// Awaited only at the very end, after the sidebar is built: each note's
@@ -708,7 +709,7 @@ export class NotesListView extends ItemView {
 		this.renderSearchForm(sidebar, searchFocus);
 
 		const activityPanel = sidebar.createDiv({ cls: "notes-list-activity" });
-		activityPanel.createEl("h4", { text: "Activity", cls: "notes-list-panel-title" });
+		activityPanel.createEl("h4", { text: t("view.activity"), cls: "notes-list-panel-title" });
 		const heatmapSelection: HeatmapSelection = {
 			selectedDate: this.selectedDate,
 			onSelectDate: (date) => {
@@ -741,52 +742,8 @@ export class NotesListView extends ItemView {
 		const activeFilters = sidebar.createDiv({ cls: "notes-list-active-filters" });
 		activeFilters.toggleClass("is-empty", !hasActiveFilter);
 
-		if (this.searchMatches) {
-			this.renderFilterPill(activeFilters, `"${this.searchQuery}"`, "Clear search", () => this.clearSearch());
-		}
-
-		if (this.selectedTag) {
-			const tagLabel = this.selectedTag === UNTAGGED ? "Untagged" : `#${this.selectedTag}`;
-			this.renderFilterPill(activeFilters, tagLabel, "Clear tag filter", () => {
-				this.selectedTag = null;
-				this.currentPage = 1;
-				void this.render();
-			});
-		}
-
-		if (this.selectedTaskFilter) {
-			const taskFilter = TASK_FILTERS.find((t) => t.filter === this.selectedTaskFilter);
-			this.renderFilterPill(activeFilters, `Tasks: ${taskFilter?.label.toLowerCase() ?? ""}`, "Clear tasks filter", () => {
-				this.selectedTaskFilter = null;
-				this.currentPage = 1;
-				void this.render();
-			});
-		}
-
-		if (this.selectedDate) {
-			this.renderFilterPill(
-				activeFilters,
-				moment(this.selectedDate).format("D MMM YYYY"),
-				"Clear date filter",
-				() => {
-					this.selectedDate = null;
-					this.currentPage = 1;
-					void this.render();
-				}
-			);
-		}
-
-		if (this.selectedMonth) {
-			this.renderFilterPill(
-				activeFilters,
-				moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY"),
-				"Clear month filter",
-				() => {
-					this.selectedMonth = null;
-					this.currentPage = 1;
-					void this.render();
-				}
-			);
+		for (const filter of this.activeFilters()) {
+			this.renderFilterPill(activeFilters, filter.label, filter.clearLabel, filter.clear);
 		}
 
 		if (!hasActiveFilter) {
@@ -800,7 +757,7 @@ export class NotesListView extends ItemView {
 		}
 		this.renderFilterSections(sidebar, narrow, [
 			{
-				title: "Tags",
+				title: t("view.tags"),
 				cls: "notes-tag-panel",
 				collapsed: this.tagPanelCollapsed,
 				setCollapsed: (collapsed) => (this.tagPanelCollapsed = collapsed),
@@ -826,7 +783,7 @@ export class NotesListView extends ItemView {
 					),
 			},
 			{
-				title: "Tasks",
+				title: t("view.tasks"),
 				cls: "notes-task-panel",
 				collapsed: this.taskPanelCollapsed,
 				setCollapsed: (collapsed) => (this.taskPanelCollapsed = collapsed),
@@ -895,7 +852,7 @@ export class NotesListView extends ItemView {
 		}
 		if (!written) {
 			undo();
-			new Notice("Couldn't update the task: the note has changed. Try again in a moment.");
+			new Notice(t("view.taskUpdateFailed"));
 		}
 	}
 
@@ -956,7 +913,8 @@ export class NotesListView extends ItemView {
 	// tree's row markup.
 	private renderTaskFilters(container: HTMLElement, allEntries: NoteEntry[]): void {
 		const list = container.createEl("ul", { cls: "notes-tag-tree-list" });
-		for (const { filter, label } of TASK_FILTERS) {
+		for (const filter of TASK_FILTERS) {
+			const label = t(`tasks.${filter}` as const);
 			const count = allEntries.filter((e) => noteMatchesTaskFilter(e.tasks, filter)).length;
 			const row = list.createEl("li", { cls: "notes-tag-tree-item" }).createDiv({ cls: "notes-tag-tree-row" });
 			row.createSpan({ cls: "notes-tag-tree-toggle" });
@@ -985,9 +943,9 @@ export class NotesListView extends ItemView {
 		const inputContainer = form.createDiv({ cls: "search-input-container" });
 		const input = inputContainer.createEl("input", {
 			type: "search",
-			placeholder: "Search notes",
+			placeholder: t("view.searchPlaceholder"),
 			value: this.searchDraft,
-			attr: { "aria-label": "Search notes", enterkeyhint: "search", spellcheck: "false" },
+			attr: { "aria-label": t("view.searchPlaceholder"), enterkeyhint: "search", spellcheck: "false" },
 		});
 		input.addEventListener("input", () => {
 			this.searchDraft = input.value;
@@ -1004,15 +962,15 @@ export class NotesListView extends ItemView {
 		// layout and only the icon in the narrow one (.is-narrow).
 		const searchButton = form.createEl("button", {
 			cls: "notes-list-search-button",
-			attr: { type: "submit", "aria-label": "Search" },
+			attr: { type: "submit", "aria-label": t("view.search") },
 		});
 		setIcon(searchButton.createSpan({ cls: "notes-list-search-button-icon" }), "search");
-		searchButton.createSpan({ text: "Search", cls: "notes-list-search-button-label" });
+		searchButton.createSpan({ text: t("view.search"), cls: "notes-list-search-button-label" });
 		// The narrow layout's "new note" button, next to the search button
 		// (hidden in two columns, where the notes header has its own).
 		const newNoteButton = form.createEl("button", {
 			cls: "notes-list-search-new-note",
-			attr: { type: "button", "aria-label": "New note" },
+			attr: { type: "button", "aria-label": t("view.newNote") },
 		});
 		setIcon(newNoteButton, "plus");
 		newNoteButton.addEventListener("click", () => void this.plugin.createUniqueNote());
@@ -1022,20 +980,56 @@ export class NotesListView extends ItemView {
 		});
 	}
 
+	// The active filters, each with its pill label and how to clear it: shared
+	// by the pills and by the empty-list message, so both always agree.
+	private activeFilters(): Array<{ label: string; clearLabel: string; clear: () => void }> {
+		const resetTo = (reset: () => void) => () => {
+			reset();
+			this.currentPage = 1;
+			void this.render();
+		};
+		const filters: Array<{ label: string; clearLabel: string; clear: () => void }> = [];
+		if (this.searchMatches) {
+			filters.push({ label: `"${this.searchQuery}"`, clearLabel: t("view.clearSearch"), clear: () => this.clearSearch() });
+		}
+		if (this.selectedTag) {
+			filters.push({
+				label: this.selectedTag === UNTAGGED ? t("tags.untagged") : `#${this.selectedTag}`,
+				clearLabel: t("view.clearTag"),
+				clear: resetTo(() => (this.selectedTag = null)),
+			});
+		}
+		if (this.selectedTaskFilter) {
+			filters.push({
+				label: t(`tasks.pill.${this.selectedTaskFilter}` as const),
+				clearLabel: t("view.clearTasks"),
+				clear: resetTo(() => (this.selectedTaskFilter = null)),
+			});
+		}
+		if (this.selectedDate) {
+			filters.push({
+				label: moment(this.selectedDate).format("D MMM YYYY"),
+				clearLabel: t("view.clearDate"),
+				clear: resetTo(() => (this.selectedDate = null)),
+			});
+		}
+		if (this.selectedMonth) {
+			filters.push({
+				label: moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY"),
+				clearLabel: t("view.clearMonth"),
+				clear: resetTo(() => (this.selectedMonth = null)),
+			});
+		}
+		return filters;
+	}
+
+	// One whole sentence per case, listing the same labels as the pills,
+	// rather than a sentence assembled from fragments, which wouldn't
+	// translate (word order and agreement differ between languages).
 	private buildEmptyMessage(): string {
-		const searchPart = this.searchMatches ? `matching "${this.searchQuery}"` : "";
-		const tagPart =
-			this.selectedTag === UNTAGGED ? "without tags" : this.selectedTag ? `tagged #${this.selectedTag}` : "";
-		const taskPart = TASK_FILTERS.find((t) => t.filter === this.selectedTaskFilter)?.emptyMessage ?? "";
-		const datePart = this.selectedDate ? `on ${moment(this.selectedDate).format("D MMM YYYY")}` : "";
-		const monthPart = this.selectedMonth
-			? `in ${moment(this.selectedMonth, "YYYY-MM").format("MMMM YYYY")}`
-			: "";
-		const parts = [searchPart, tagPart, taskPart, datePart, monthPart].filter(Boolean);
-
-		if (parts.length === 0) return "No notes found in the configured folder.";
-
-		return `No notes ${parts.join(" ")}.`;
+		const filters = this.activeFilters();
+		if (filters.length === 0) return t("view.emptyFolder");
+		return t("view.emptyFiltered", { filters: filters.map((f) => f.label).join(", ") });
 	}
 
 	private renderPagination(container: HTMLElement, totalPages: number): void {
@@ -1046,7 +1040,7 @@ export class NotesListView extends ItemView {
 		if (this.currentPage > 1) {
 			const prev = nav.createEl("button", {
 				cls: "notes-list-page-button",
-				attr: { type: "button", "aria-label": "Previous page" },
+				attr: { type: "button", "aria-label": t("view.previousPage") },
 			});
 			setIcon(prev, "chevron-left");
 			prev.addEventListener("click", () => this.goToPage(this.currentPage - 1));
@@ -1070,7 +1064,7 @@ export class NotesListView extends ItemView {
 		if (this.currentPage < totalPages) {
 			const next = nav.createEl("button", {
 				cls: "notes-list-page-button",
-				attr: { type: "button", "aria-label": "Next page" },
+				attr: { type: "button", "aria-label": t("view.nextPage") },
 			});
 			setIcon(next, "chevron-right");
 			next.addEventListener("click", () => this.goToPage(this.currentPage + 1));
@@ -1144,7 +1138,7 @@ export class NotesListView extends ItemView {
 		if (open + done > 0) {
 			const taskCount = itemHeader.createSpan({
 				cls: "notes-list-task-count",
-				attr: { "aria-label": `${done} of ${open + done} tasks completed` },
+				attr: { "aria-label": tn("view.taskCounter", open + done, { done }) },
 			});
 			setIcon(taskCount.createSpan({ cls: "notes-list-task-count-icon" }), "list-checks");
 			taskCount.createSpan({ text: `${done}/${open + done}` });
@@ -1158,7 +1152,7 @@ export class NotesListView extends ItemView {
 		// !important before this).
 		const pinButton = itemHeader.createEl("button", {
 			cls: "notes-list-pin-button clickable-icon" + (entry.pinned ? " is-active" : ""),
-			attr: { "aria-label": entry.pinned ? "Unpin note" : "Pin note", type: "button" },
+			attr: { "aria-label": t(entry.pinned ? "view.unpinNote" : "view.pinNote"), type: "button" },
 		});
 		setIcon(pinButton, "bookmark");
 		// A plain (non-async) callback, deliberately: addEventListener's own

@@ -63,9 +63,5 @@ export function setTaskLineChecked(line: string, checked: boolean): string | nul
 	return line.replace(TASK_LINE, `$1${checked ? "x" : " "}$3`);
 }
 
-/** The Tasks section's entries, in display order. */
-export const TASK_FILTERS: Array<{ filter: TaskFilter; label: string; emptyMessage: string }> = [
-	{ filter: "any", label: "Any", emptyMessage: "with tasks" },
-	{ filter: "open", label: "Open", emptyMessage: "with open tasks" },
-	{ filter: "done", label: "Completed", emptyMessage: "with completed tasks" },
-];
+/** The Tasks section's entries, in display order. Their labels are UI strings ("tasks.<filter>" in i18n.ts). */
+export const TASK_FILTERS: readonly TaskFilter[] = ["any", "open", "done"];

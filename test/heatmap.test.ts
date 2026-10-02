@@ -17,6 +17,10 @@ describe("monthLabelText", () => {
 		expect(monthLabelText("Sep", 2)).toBe("Sep");
 	});
 
+	it("always capitalizes the first letter, for locales with lower-case month names", () => {
+		expect(monthLabelText("giu", 4)).toBe("Giu");
+	});
+
 	it("shrinks to the capitalized initial plus a period with a single column", () => {
 		expect(monthLabelText("Sep", 1)).toBe("S.");
 		expect(monthLabelText("set", 1)).toBe("S.");

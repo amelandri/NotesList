@@ -293,12 +293,12 @@
 }
 
 /* "2/5" completed tasks, right-aligned next to the pin button (the header is
-   space-between, so margin-left: auto keeps the two together on the right). */
+   space-between, so margin-inline-start: auto keeps the two together at the end). */
 .notes-list-task-count {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--size-2-1);
-	margin-left: auto;
+	margin-inline-start: auto;
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
 	letter-spacing: 0.1rem;
@@ -551,7 +551,7 @@
 }
 
 .notes-heatmap-total {
-	margin-left: auto;
+	margin-inline-start: auto;
 }
 
 .notes-tag-tree-panel {
@@ -737,11 +737,11 @@
 .notes-tag-tree-list {
 	list-style: none;
 	margin: 0;
-	padding-left: var(--size-4-3);
+	padding-inline-start: var(--size-4-3);
 }
 
 .notes-tag-tree > .notes-tag-tree-list {
-	padding-left: 0;
+	padding-inline-start: 0;
 }
 
 /* The "Untagged" entry, always last: set slightly apart and in italics, so

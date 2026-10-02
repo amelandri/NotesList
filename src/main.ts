@@ -23,6 +23,7 @@ import {
 	migrateSettings,
 	resolveDeviceSettings,
 } from "./settings";
+import { t } from "./i18n";
 import { moment } from "./moment";
 import { NotesListView, VIEW_TYPE_NOTES_LIST } from "./view";
 
@@ -53,7 +54,7 @@ export function sanitizeFilenameSegment(name: string): string {
 // Shared validator for both "number" settings (Preview length, Notes per
 // page): returning a message rejects the value instead of persisting it.
 export function validatePositiveInteger(value: number): string | void {
-	if (!Number.isInteger(value) || value < 1) return "Enter a whole number greater than 0.";
+	if (!Number.isInteger(value) || value < 1) return t("settings.positiveInteger");
 }
 
 export function resolveUniqueNoteNameFormat(configured: string): string {
@@ -98,7 +99,7 @@ export default class NotesListPlugin extends Plugin {
 
 		this.registerView(VIEW_TYPE_NOTES_LIST, (leaf) => new NotesListView(leaf, this));
 
-		this.addRibbonIcon("list-ordered", "Open notes list", () => {
+		this.addRibbonIcon("list-ordered", t("ribbon.open"), () => {
 			void this.activateView();
 		});
 
@@ -109,7 +110,7 @@ export default class NotesListPlugin extends Plugin {
 		// plugin review as such).
 		this.addCommand({
 			id: "open",
-			name: "Open",
+			name: t("command.open"),
 			callback: () => {
 				void this.activateView();
 			},
@@ -122,7 +123,7 @@ export default class NotesListPlugin extends Plugin {
 		// (and bindable to a shortcut) even when no Notes List view is open.
 		this.addCommand({
 			id: "create-new-note",
-			name: "Create new note",
+			name: t("command.createNote"),
 			callback: () => {
 				void this.createUniqueNote();
 			},
@@ -133,7 +134,7 @@ export default class NotesListPlugin extends Plugin {
 		// Mod+F and "/" already do this (see NotesListView.onOpen()).
 		this.addCommand({
 			id: "search-notes",
-			name: "Search notes",
+			name: t("command.search"),
 			callback: () => {
 				void this.activateView().then((leaf) => {
 					if (leaf.view instanceof NotesListView) leaf.view.focusSearch();
@@ -217,15 +218,13 @@ export default class NotesListPlugin extends Plugin {
 
 		const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
 		if (!(templateFile instanceof TFile)) {
-			new Notice(`Notes List: template not found at "${templatePath}". Check the Template setting.`);
+			new Notice(t("notice.templateNotFound", { path: templatePath }));
 			return null;
 		}
 
 		const frontmatter = this.app.metadataCache.getFileCache(templateFile)?.frontmatter;
 		if (!frontmatter || !("timestamp" in frontmatter)) {
-			new Notice(
-				`Notes List: the template note "${templatePath}" is missing a "timestamp" property in its frontmatter. Add one (any value) to use it as a template.`
-			);
+			new Notice(t("notice.templateNoTimestamp", { path: templatePath }));
 			return null;
 		}
 
@@ -280,7 +279,7 @@ export default class NotesListPlugin extends Plugin {
 			await this.app.workspace.getLeaf(false).openFile(file);
 		} catch (error) {
 			console.error("Notes List: failed to create a new note", error);
-			new Notice("Could not create the note — see the developer console for details.");
+			new Notice(t("notice.createFailed"));
 		}
 	}
 
@@ -346,31 +345,31 @@ class NotesListSettingTab extends PluginSettingTab {
 		return [
 			{
 				type: "group",
-				heading: "Folder and files",
+				heading: t("settings.folderGroup"),
 				items: [
 					{
-						name: "Folder",
-						desc: "Vault folder to watch (empty = entire vault)",
-						control: { type: "folder", key: "folderPath", placeholder: "e.g. Journal" },
+						name: t("settings.folder"),
+						desc: t("settings.folderDesc"),
+						control: { type: "folder", key: "folderPath", placeholder: t("settings.folderPlaceholder") },
 					},
 					{
-						name: "Subfolders",
-						desc: "includes its subfolders.",
+						name: t("settings.subfolders"),
+						desc: t("settings.subfoldersDesc"),
 						control: { type: "toggle", key: "includeSubfolders" },
 					},
 					{
-						name: "Template",
-						desc: 'Optional note to use as a template for new notes created with the New Note button (empty = a blank note). The template must have a "timestamp" property in its frontmatter.',
+						name: t("settings.template"),
+						desc: t("settings.templateDesc"),
 						control: {
 							type: "file",
 							key: "templatePath",
-							placeholder: "e.g. Templates/Daily note.md",
+							placeholder: t("settings.templatePlaceholder"),
 							filter: (file) => file.extension === "md",
 						},
 					},
 					{
-						name: "Unique note name format",
-						desc: "moment.js format for the New Note button's auto-generated file name, and for recognizing a note as still using it (\"Show note name\" below).",
+						name: t("settings.uniqueName"),
+						desc: t("settings.uniqueNameDesc"),
 						control: { type: "text", key: "uniqueNoteNameFormat", placeholder: DEFAULT_UNIQUE_NOTE_NAME_FORMAT },
 					},
 				],
@@ -386,42 +385,43 @@ class NotesListSettingTab extends PluginSettingTab {
 	// at the top (no control) explains that these values are per device type.
 	private deviceGroups(mobile: boolean): SettingDefinitionItem<keyof NotesListSettings>[] {
 		const key = <K extends Parameters<typeof deviceSettingKey>[0]>(name: K) => deviceSettingKey(name, mobile);
-		const thisDevice = mobile ? "the mobile app (phone and tablet)" : "the desktop app";
-		const otherDevice = mobile ? "the desktop app" : "the mobile app";
 		return [
 			{
 				type: "group",
-				heading: "Notes list",
+				heading: t("settings.notesListGroup"),
 				items: [
 					{
-						name: "Device-specific settings",
-						desc: `The settings in this section and in the sidebar section are saved separately for each kind of device. Changes made here apply only to ${thisDevice}; ${otherDevice} keeps its own values.`,
+						name: t("settings.deviceNote"),
+						desc: t(mobile ? "settings.deviceNoteMobile" : "settings.deviceNoteDesktop"),
 					},
 					{
-						name: "Show note name",
-						desc: "Whether to show each note's file name.",
+						name: t("settings.showNoteName"),
+						desc: t("settings.showNoteNameDesc"),
 						control: {
 							type: "dropdown",
 							key: key("showNoteName"),
 							options: {
-								never: "Never",
-								always: "Always",
-								whenDifferent: "When different from unique note name",
+								never: t("settings.showNoteName.never"),
+								always: t("settings.showNoteName.always"),
+								whenDifferent: t("settings.showNoteName.whenDifferent"),
 							} satisfies Record<ShowNoteNameMode, string>,
 						},
 					},
 					{
-						name: "Content display",
-						desc: 'Show a note\'s full content or a truncated preview. A note can override this with "content-display" frontmatter property.',
+						name: t("settings.contentDisplay"),
+						desc: t("settings.contentDisplayDesc"),
 						control: {
 							type: "dropdown",
 							key: key("contentDisplay"),
-							options: { full: "Full", preview: "Preview" } satisfies Record<ContentDisplayMode, string>,
+							options: {
+								full: t("settings.contentDisplay.full"),
+								preview: t("settings.contentDisplay.preview"),
+							} satisfies Record<ContentDisplayMode, string>,
 						},
 					},
 					{
-						name: "Preview length",
-						desc: "Maximum number of characters shown when Content display is set to Preview.",
+						name: t("settings.previewLength"),
+						desc: t("settings.previewLengthDesc"),
 						control: {
 							type: "number",
 							key: key("previewLength"),
@@ -432,13 +432,13 @@ class NotesListSettingTab extends PluginSettingTab {
 						},
 					},
 					{
-						name: "Show date group headers",
-						desc: 'Show "Today" / "Yesterday" / "This week" / "Older" headers above notes in the list.',
+						name: t("settings.dateGroups"),
+						desc: t("settings.dateGroupsDesc"),
 						control: { type: "toggle", key: key("showDateGroups") },
 					},
 					{
-						name: "Notes per page",
-						desc: "Number of notes shown per page in the list.",
+						name: t("settings.notesPerPage"),
+						desc: t("settings.notesPerPageDesc"),
 						control: {
 							type: "number",
 							key: key("notesPerPage"),
@@ -452,20 +452,20 @@ class NotesListSettingTab extends PluginSettingTab {
 			},
 			{
 				type: "group",
-				heading: "Sidebar",
+				heading: t("settings.sidebarGroup"),
 				items: [
 					{
-						name: "Tag tree expansion",
-						desc: "How far the tag tree is expanded when it's shown. You can still expand or collapse any tag by hand.",
+						name: t("settings.tagTreeExpansion"),
+						desc: t("settings.tagTreeExpansionDesc"),
 						control: {
 							type: "dropdown",
 							key: key("tagTreeExpandLevel"),
 							defaultValue: DEFAULT_SETTINGS.tagTreeExpandLevel,
 							options: {
-								"1": "Fully collapsed",
-								"2": "Expand to level 2",
-								"3": "Expand to level 3",
-								all: "Fully expanded",
+								"1": t("settings.tagTreeExpansion.1"),
+								"2": t("settings.tagTreeExpansion.2"),
+								"3": t("settings.tagTreeExpansion.3"),
+								all: t("settings.tagTreeExpansion.all"),
 							} satisfies Record<TagTreeExpandLevel, string>,
 						},
 					},
