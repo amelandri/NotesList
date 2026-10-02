@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- On desktop, the new note button in the notes header is now labeled "New note" next to its "+" icon and uses the accent color. The single-column layout keeps its icon-only button next to search.
+
 ### Fixed
 
 - In the single-column layout, date group headers ("Today", "This week"…) no longer overlap the note above them: the negative top margin that tightens the two-column list doesn't apply there.

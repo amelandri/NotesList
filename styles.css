@@ -29,12 +29,16 @@
 	--nl-title-font-size: var(--notes-list-title-font-size, 1em);
 	--nl-date-font-size: var(--notes-list-date-font-size, var(--font-ui-small));
 	--nl-panel-title-font-size: var(--notes-list-panel-title-font-size, var(--h4-size));
-	/* The "Notes" header row's height: its title's line box, or the 24px new
-	   note button if that's taller. Shared by .notes-list-header and the
+	/* The "Notes" header row's height: its title's line box, or the new note
+	   button (--nl-new-note-button-height) if that's taller. Shared by .notes-list-header and the
 	   sidebar's offset, so the two stay aligned whatever the title size is.
 	   Both use it where the font size is the same inherited one, so an em-based
 	   title size resolves identically in each. */
-	--nl-header-height: max(24px, calc(var(--nl-panel-title-font-size) * var(--h4-line-height, 1.3)));
+	--nl-new-note-button-height: 28px;
+	--nl-header-height: max(
+		var(--nl-new-note-button-height),
+		calc(var(--nl-panel-title-font-size) * var(--h4-line-height, 1.3))
+	);
 }
 
 .notes-list-view.is-narrow {
@@ -198,22 +202,34 @@
 	visibility: hidden;
 }
 
+/* "+ New note", accent-colored, in the two-column header (the narrow layout
+   uses the icon-only button next to search instead). Its height is
+   --nl-new-note-button-height, which also feeds --nl-header-height, so the
+   sidebar's alignment with the list accounts for it. Two classes on the color
+   rules, to win over Obsidian's `button:not(.clickable-icon)` reset. */
 .notes-list-new-note-button {
 	flex-shrink: 0;
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border-radius: 50%;
-	background-color: var(--background-modifier-hover);
-	color: var(--icon-color);
+	gap: var(--size-2-2);
+	height: var(--nl-new-note-button-height);
+	padding: 0 var(--size-4-3) 0 var(--size-4-2);
+	border-radius: var(--radius-m);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
 }
 
-.notes-list-new-note-button:hover {
-	background-color: var(--background-modifier-active-hover);
-	color: var(--icon-color-hover);
+.notes-list-header .notes-list-new-note-button {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.notes-list-header .notes-list-new-note-button:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+.notes-list-new-note-button-icon {
+	display: flex;
 }
 
 .notes-list-new-note-button svg {

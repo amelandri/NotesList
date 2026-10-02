@@ -643,11 +643,14 @@ export class NotesListView extends ItemView {
 		const titleGroup = header.createDiv({ cls: "notes-list-header-title-group" });
 		titleGroup.createEl("h4", { text: "Notes", cls: "notes-list-panel-title" });
 
+		// Two columns only: the narrow layout hides it in favor of the icon-only
+		// button next to search (see renderSearchForm()).
 		const newNoteButton = header.createEl("button", {
 			cls: "notes-list-new-note-button",
-			attr: { "aria-label": "New note", type: "button" },
+			attr: { type: "button" },
 		});
-		setIcon(newNoteButton, "plus");
+		setIcon(newNoteButton.createSpan({ cls: "notes-list-new-note-button-icon" }), "plus");
+		newNoteButton.createSpan({ text: "New note" });
 		newNoteButton.addEventListener("click", () => void this.plugin.createUniqueNote());
 
 		// Awaited only at the very end, after the sidebar is built: each note's
