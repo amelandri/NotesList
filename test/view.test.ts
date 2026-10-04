@@ -14,20 +14,20 @@ import {
 } from "../src/view";
 
 describe("cutAtPreviewMarker", () => {
-	it("cuts at a marker on its own line, with the ellipsis on its own paragraph", () => {
-		expect(cutAtPreviewMarker("Intro.\n\n<!-- more -->\n\nThe rest.")).toBe("Intro.\n\n…");
+	it("cuts at a marker on its own line, flagged as truncated, with no ellipsis in the text", () => {
+		expect(cutAtPreviewMarker("Intro.\n\n<!-- more -->\n\nThe rest.")).toEqual({ text: "Intro.", truncated: true });
 	});
 
-	it("cuts at a mid-line marker, with the ellipsis inline", () => {
-		expect(cutAtPreviewMarker("Intro <!--more--> the rest.")).toBe("Intro …");
+	it("cuts at a mid-line marker, with the ellipsis inline where the sentence breaks off", () => {
+		expect(cutAtPreviewMarker("Intro <!--more--> the rest.")).toEqual({ text: "Intro …", truncated: true });
 	});
 
-	it("adds no ellipsis when nothing follows the marker", () => {
-		expect(cutAtPreviewMarker("Whole note.\n<!-- more -->\n")).toBe("Whole note.");
+	it("isn't truncated when nothing follows the marker", () => {
+		expect(cutAtPreviewMarker("Whole note.\n<!-- more -->\n")).toEqual({ text: "Whole note.", truncated: false });
 	});
 
 	it("cuts at the first marker only", () => {
-		expect(cutAtPreviewMarker("A\n<!-- more -->\nB\n<!-- more -->\nC")).toBe("A\n\n…");
+		expect(cutAtPreviewMarker("A\n<!-- more -->\nB\n<!-- more -->\nC")).toEqual({ text: "A", truncated: true });
 	});
 
 	it("ignores a marker inside a fenced code block", () => {
@@ -43,24 +43,26 @@ describe("cutAtPreviewMarker", () => {
 describe("previewBody", () => {
 	const marked = "Intro.\n\n<!-- more -->\n\n" + "x".repeat(50);
 	const long = "y".repeat(50);
+	const cutAtMarker = { text: "Intro.", truncated: true };
+	const cutAtLength = { text: "y".repeat(10) + "…", truncated: true };
 
 	it("frontmatter 'full' shows everything, marker or not", () => {
-		expect(previewBody(marked, "full", "preview", 10)).toBe(marked);
+		expect(previewBody(marked, "full", "preview", 10)).toEqual({ text: marked, truncated: false });
 	});
 
 	it("frontmatter 'preview' cuts at the marker, else at the preview length", () => {
-		expect(previewBody(marked, "preview", "full", 10)).toBe("Intro.\n\n…");
-		expect(previewBody(long, "preview", "full", 10)).toBe("y".repeat(10) + "…");
+		expect(previewBody(marked, "preview", "full", 10)).toEqual(cutAtMarker);
+		expect(previewBody(long, "preview", "full", 10)).toEqual(cutAtLength);
 	});
 
 	it("a marker cuts there even when the setting is 'full', and wins over the preview length", () => {
-		expect(previewBody(marked, null, "full", 10)).toBe("Intro.\n\n…");
-		expect(previewBody(marked, null, "preview", 3)).toBe("Intro.\n\n…");
+		expect(previewBody(marked, null, "full", 10)).toEqual(cutAtMarker);
+		expect(previewBody(marked, null, "preview", 3)).toEqual(cutAtMarker);
 	});
 
 	it("without frontmatter or marker, follows the setting", () => {
-		expect(previewBody(long, null, "full", 10)).toBe(long);
-		expect(previewBody(long, null, "preview", 10)).toBe("y".repeat(10) + "…");
+		expect(previewBody(long, null, "full", 10)).toEqual({ text: long, truncated: false });
+		expect(previewBody(long, null, "preview", 10)).toEqual(cutAtLength);
 	});
 });
 
@@ -263,30 +265,30 @@ describe("findUnbreakableBlocks", () => {
 });
 
 describe("truncateMarkdown", () => {
-	it("returns a body within the limit unchanged", () => {
-		expect(truncateMarkdown("short", 10)).toBe("short");
+	it("returns a body within the limit unchanged, not truncated", () => {
+		expect(truncateMarkdown("short", 10)).toEqual({ text: "short", truncated: false });
 	});
 
 	it("cuts plain text at the limit, with an inline ellipsis", () => {
-		expect(truncateMarkdown("hello world", 5)).toBe("hello…");
+		expect(truncateMarkdown("hello world", 5)).toEqual({ text: "hello…", truncated: true });
 	});
 
-	it("moves a cut inside a code block to right after it, ellipsis on its own paragraph", () => {
+	it("moves a cut inside a code block to right after it, with no ellipsis paragraph", () => {
 		const body = "intro\n```\nline one\nline two\n```\nmore text after";
-		expect(truncateMarkdown(body, 12)).toBe("intro\n```\nline one\nline two\n```\n\n…");
+		expect(truncateMarkdown(body, 12)).toEqual({ text: "intro\n```\nline one\nline two\n```", truncated: true });
 	});
 
 	it("moves a cut inside a table to right after its last row", () => {
 		const body = "| a | b |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n\nmore text after";
-		expect(truncateMarkdown(body, 25)).toBe("| a | b |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n\n…");
+		expect(truncateMarkdown(body, 25)).toEqual({ text: "| a | b |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |", truncated: true });
 	});
 
-	it("returns the whole body, with no ellipsis, when the protected block is the last thing in it", () => {
+	it("returns the whole body, not truncated, when the protected block is the last thing in it", () => {
 		const body = "intro\n```\nline one\nline two\n```\n";
-		expect(truncateMarkdown(body, 12)).toBe(body);
+		expect(truncateMarkdown(body, 12)).toEqual({ text: body, truncated: false });
 	});
 
 	it("still cuts normally before a block that starts after the limit", () => {
-		expect(truncateMarkdown("hello world\n```\ncode\n```", 5)).toBe("hello…");
+		expect(truncateMarkdown("hello world\n```\ncode\n```", 5)).toEqual({ text: "hello…", truncated: true });
 	});
 });

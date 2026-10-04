@@ -200,11 +200,21 @@ export function findUnbreakableBlocks(body: string): Array<[number, number]> {
 // content the way a "-----" (a horizontal rule) would.
 const PREVIEW_MARKER = /<!--\s*more\s*-->/i;
 
-// `body` cut at its first preview marker outside a fenced code block, with an
-// ellipsis when anything follows (inline after a mid-line marker, on its own
-// paragraph after a marker at the start of a line, as truncateMarkdown does).
-// null when there's no marker.
-export function cutAtPreviewMarker(body: string): string | null {
+/**
+ * What a note's body shows in the list. `truncated` says whether anything was
+ * left out, which the list shows as a "Continue reading" link (see
+ * renderEntry()), rather than as a "…" paragraph inside the text. An
+ * inline "…" stays only where a sentence is broken off mid-line.
+ */
+export interface Preview {
+	text: string;
+	truncated: boolean;
+}
+
+// `body` cut at its first preview marker outside a fenced code block,
+// `truncated` when anything follows it (plus an inline "…" after a mid-line
+// marker, where a sentence breaks off). null when there's no marker.
+export function cutAtPreviewMarker(body: string): Preview | null {
 	let offset = 0;
 	let closingFence: RegExp | null = null;
 	for (const line of body.split("\n")) {
@@ -221,8 +231,9 @@ export function cutAtPreviewMarker(body: string): string | null {
 					const before = line.slice(0, match.index);
 					const head = (body.slice(0, offset) + before).trimEnd();
 					const rest = body.slice(offset + match.index + match[0].length);
-					if (rest.trim() === "") return head;
-					return head + (before.trim() === "" ? "\n\n…" : " …");
+					if (rest.trim() === "") return { text: head, truncated: false };
+					// Mid-line, the sentence goes on after the marker: say so inline.
+					return { text: before.trim() === "" ? head : head + " …", truncated: true };
 				}
 			}
 		}
@@ -230,7 +241,6 @@ export function cutAtPreviewMarker(body: string): string | null {
 	}
 	return null;
 }
-
 // What a note's body shows in the list, by precedence:
 // 1. its own "content-display" frontmatter: "full" shows everything, "preview"
 //    cuts at the preview marker, or at previewLength when there's none;
@@ -242,24 +252,25 @@ export function previewBody(
 	frontmatterMode: ContentDisplayMode | null,
 	settingMode: ContentDisplayMode,
 	previewLength: number
-): string {
-	if (frontmatterMode === "full") return body;
+): Preview {
+	if (frontmatterMode === "full") return { text: body, truncated: false };
 	const atMarker = cutAtPreviewMarker(body);
 	if (atMarker !== null) return atMarker;
-	return (frontmatterMode ?? settingMode) === "preview" ? truncateMarkdown(body, previewLength) : body;
+	return (frontmatterMode ?? settingMode) === "preview"
+		? truncateMarkdown(body, previewLength)
+		: { text: body, truncated: false };
 }
-
-export function truncateMarkdown(body: string, maxLength: number): string {
-	if (body.length <= maxLength) return body;
+export function truncateMarkdown(body: string, maxLength: number): Preview {
+	if (body.length <= maxLength) return { text: body, truncated: false };
 
 	const block = findUnbreakableBlocks(body).find(([start, end]) => start < maxLength && maxLength < end);
-	if (!block) return body.slice(0, maxLength).trimEnd() + "…";
+	// Cut mid-text: the inline ellipsis marks where the sentence breaks off.
+	if (!block) return { text: body.slice(0, maxLength).trimEnd() + "…", truncated: true };
 
 	const blockEnd = block[1];
-	if (body.slice(blockEnd).trim() === "") return body;
-	return body.slice(0, blockEnd).trimEnd() + "\n\n…";
+	if (body.slice(blockEnd).trim() === "") return { text: body, truncated: false };
+	return { text: body.slice(0, blockEnd).trimEnd(), truncated: true };
 }
-
 // Doesn't depend on any view/plugin state — a free function (not a method)
 // so it can be unit-tested directly, and reused as-is from resolveDate()
 // below.
@@ -1192,6 +1203,11 @@ export class NotesListView extends ItemView {
 			}
 		});
 
+		// "Continue reading": filled in below, once the body is known to be cut.
+		// Created here, before the first await, so it stays between the content
+		// and the tags row.
+		const readMoreSlot = item.createDiv({ cls: "notes-list-read-more-slot" });
+
 		// The note's tags, from the frontmatter and the body alike, in a row of
 		// their own below the content (the body's inline tags are stripped from
 		// the text below). Created before the first await so it stays in place
@@ -1215,11 +1231,29 @@ export class NotesListView extends ItemView {
 		const raw = await this.app.vault.cachedRead(file);
 		const cache = this.app.metadataCache.getFileCache(file);
 		// Tags stripped before truncating, so the preview length counts text.
-		let body = stripInlineTags(stripFrontmatter(raw)).trim();
+		const body = stripInlineTags(stripFrontmatter(raw)).trim();
 
 		const { contentDisplay, previewLength } = this.plugin.deviceSettings();
-		body = previewBody(body, this.contentDisplayOverride(cache?.frontmatter), contentDisplay, previewLength);
+		const preview = previewBody(body, this.contentDisplayOverride(cache?.frontmatter), contentDisplay, previewLength);
 
-		await MarkdownRenderer.render(this.app, body, contentEl, file.path, this.markdownComponent);
+		// A cut note gets an explicit link to the rest, so the cut is obvious
+		// rather than a "…" that's easy to miss. Same openNote() as the date
+		// link and the double-click.
+		if (preview.truncated) {
+			const link = readMoreSlot.createEl("a", {
+				cls: "notes-list-read-more",
+				href: file.path,
+			});
+			link.createSpan({ text: t("view.readMore") });
+			setIcon(link.createSpan({ cls: "notes-list-read-more-icon" }), "arrow-right");
+			link.addEventListener("click", (evt) => {
+				evt.preventDefault();
+				openNote(evt);
+			});
+		} else {
+			readMoreSlot.remove();
+		}
+
+		await MarkdownRenderer.render(this.app, preview.text, contentEl, file.path, this.markdownComponent);
 	}
 }

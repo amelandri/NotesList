@@ -273,7 +273,7 @@
 .notes-list-item.is-pinned {
 	padding: 0.7rem 1rem;
     border-radius: 0.3rem;
-    background-color: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+	background-color: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
 	border-bottom:0;
 	margin-bottom: 3rem;
 }
@@ -379,6 +379,36 @@
 
 .notes-list-content > *:last-child {
 	margin-bottom: 0;
+}
+
+/* A cut note (see previewBody() in view.ts) is followed by a "Continue
+   reading" link. */
+.notes-list-read-more-slot {
+	margin-top: var(--size-4-2);
+}
+
+.notes-list-read-more {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	color: var(--text-accent);
+	text-decoration: none;
+}
+
+.notes-list-read-more:hover {
+	color: var(--text-accent-hover);
+	text-decoration: underline;
+}
+
+.notes-list-read-more-icon {
+	display: flex;
+}
+
+.notes-list-read-more-icon svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* A note's tags (frontmatter and inline alike), below its content. Each is an

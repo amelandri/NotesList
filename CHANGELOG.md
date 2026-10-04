@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A note cut short in the list is now clearly marked: a "Continue reading" link below it opens the note. This replaces the "…" that used to end the preview, which was easy to miss.
 - The pagination bar also has buttons to jump to the first and the last page.
 - On desktop, the new note button in the notes header is now labeled "New note" next to its "+" icon and uses the accent color. The single-column layout keeps its icon-only button next to search.
 
