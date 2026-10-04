@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_No unreleased changes yet._
+
+## [0.2.5] - 2026-10-04
+
 ### Added
 
 - Italian translation. The plugin follows Obsidian's language setting, and falls back to English for languages it doesn't have yet. Plurals follow each language's own rules, and the "no notes" message now lists the active filters by the same labels as their pills. Heatmap month labels always start with a capital letter, also in languages that write month names in lower case.
@@ -150,7 +154,8 @@ Initial release.
 - Double-clicking a note's content opens the note.
 - The notes column follows Obsidian's "Readable line length" setting.
 
-[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.4...HEAD
+[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.5...HEAD
+[0.2.5]: https://github.com/amelandri/NotesList/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/amelandri/NotesList/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/amelandri/NotesList/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/amelandri/NotesList/compare/0.2.1...0.2.2
