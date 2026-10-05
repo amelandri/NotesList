@@ -675,7 +675,7 @@
    There's no sidebar column here: render() puts the sidebar's blocks straight
    into the layout column alongside the notes list (not display: contents,
    which the community review flags as partially supported), and `order`
-   puts them as: search, heatmap, active filters, tags, tasks, notes. With no
+   puts them as: search, heatmap, active filters, tags, notes. With no
    sidebar box there's no sticky positioning either, which would pin the
    heatmap over the list on a small screen. */
 .notes-list-view.is-narrow .notes-list-layout {
@@ -779,12 +779,13 @@
 	margin-top: 0;
 }
 
-/* The filter sections (Tags, Tasks; see renderFilterSections() in view.ts):
-   their foldable headers side by side, half the width each, and the content
-   of an open one below them at full width. Collapsed by default. */
+/* The filter sections (today only Tags; see renderFilterSections() in
+   view.ts): their foldable headers side by side, sharing the width equally
+   (one column per section, so a lone section takes the full width), and the
+   content of an open one below them at full width. Collapsed by default. */
 .notes-list-view.is-narrow .notes-list-filter-sections {
 	display: grid;
-	grid-template-columns: 1fr 1fr;
+	grid-template-columns: repeat(var(--nl-filter-section-count, 1), minmax(0, 1fr));
 	gap: var(--size-4-2);
 }
 

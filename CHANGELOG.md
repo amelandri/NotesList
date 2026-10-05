@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - An "Open tasks" view, switched from the notes header: every open task in the listed notes, in one list, grouped by the exact combination of their tags (e.g. "#alpha + #work"): a task's own tags, written on its line, when it has any, otherwise its note's. Tasks with no tags at all get their own group. Tasks can be checked off right there, and each links to its note. The sidebar's search and filters narrow it too.
 
+### Removed
+
+- The "Tasks" section in the sidebar (filter by any / open / completed tasks). The "Open tasks" view now covers open tasks; the task counter on each note stays.
+
 ## [0.2.5] - 2026-10-04
 
 ### Added

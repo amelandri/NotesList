@@ -32,7 +32,6 @@ const en = {
 	"tasksView.openNote": "Open {note}",
 	"view.activity": "Activity",
 	"view.tags": "Tags",
-	"view.tasks": "Tasks",
 	"view.newNote": "New note",
 	"view.readMore": "Continue reading",
 	"view.search": "Search",
@@ -47,7 +46,6 @@ const en = {
 	"view.emptyFiltered": "No notes match: {filters}.",
 	"view.clearSearch": "Clear search",
 	"view.clearTag": "Clear tag filter",
-	"view.clearTasks": "Clear tasks filter",
 	"view.clearDate": "Clear date filter",
 	"view.clearMonth": "Clear month filter",
 	"view.taskUpdateFailed": "Couldn't update the task: the note has changed. Try again in a moment.",
@@ -62,12 +60,6 @@ const en = {
 	// Tags and tasks
 	"tags.none": "No tags.",
 	"tags.untagged": "Untagged",
-	"tasks.any": "Any",
-	"tasks.open": "Open",
-	"tasks.done": "Completed",
-	"tasks.pill.any": "With tasks",
-	"tasks.pill.open": "Open tasks",
-	"tasks.pill.done": "Completed tasks",
 
 	// Heatmap
 	"heatmap.less": "Less",
@@ -147,7 +139,6 @@ const it: Translations = {
 	"tasksView.openNote": "Apri {note}",
 	"view.activity": "Attività",
 	"view.tags": "Tag",
-	"view.tasks": "Task",
 	"view.newNote": "Nuova nota",
 	"view.readMore": "Continua a leggere",
 	"view.search": "Cerca",
@@ -162,7 +153,6 @@ const it: Translations = {
 	"view.emptyFiltered": "Nessuna nota corrisponde a: {filters}.",
 	"view.clearSearch": "Cancella la ricerca",
 	"view.clearTag": "Rimuovi il filtro per tag",
-	"view.clearTasks": "Rimuovi il filtro per task",
 	"view.clearDate": "Rimuovi il filtro per giorno",
 	"view.clearMonth": "Rimuovi il filtro per mese",
 	"view.taskUpdateFailed": "Impossibile aggiornare il task: la nota è cambiata. Riprova tra un momento.",
@@ -175,12 +165,6 @@ const it: Translations = {
 
 	"tags.none": "Nessun tag.",
 	"tags.untagged": "Senza tag",
-	"tasks.any": "Tutti",
-	"tasks.open": "Aperti",
-	"tasks.done": "Completati",
-	"tasks.pill.any": "Con task",
-	"tasks.pill.open": "Task aperti",
-	"tasks.pill.done": "Task completati",
 
 	"heatmap.less": "Meno",
 	"heatmap.more": "Più",

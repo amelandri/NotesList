@@ -11,9 +11,6 @@ export interface TaskCounts {
 	total: number;
 }
 
-/** The Tasks section's choices: notes with any task, with an open one, or with a completed one. */
-export type TaskFilter = "any" | "open" | "done";
-
 /** The structural subset of Obsidian's ListItemCache this needs. */
 export interface TaskListItem {
 	task?: string;
@@ -47,12 +44,6 @@ export function countTasks(listItems: TaskListItem[] | undefined): TaskCounts {
 	return { open, done, total };
 }
 
-export function noteMatchesTaskFilter(counts: TaskCounts, filter: TaskFilter): boolean {
-	if (filter === "open") return counts.open > 0;
-	if (filter === "done") return counts.done > 0;
-	return counts.total > 0;
-}
-
 // A task line: optional indentation and blockquote/callout markers, a list
 // marker ("-", "*", "+", "1." or "1)"), then "[<status>]".
 const TASK_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[)([^\]])(\])/;
@@ -77,6 +68,3 @@ export function setTaskLineChecked(line: string, checked: boolean): string | nul
 	if (wasChecked === checked) return null;
 	return line.replace(TASK_LINE, `$1${checked ? "x" : " "}$3`);
 }
-
-/** The Tasks section's entries, in display order. Their labels are UI strings ("tasks.<filter>" in i18n.ts). */
-export const TASK_FILTERS: readonly TaskFilter[] = ["any", "open", "done"];

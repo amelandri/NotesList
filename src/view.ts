@@ -38,12 +38,9 @@ import {
 import {
 	countTasks,
 	isOpenTaskStatus,
-	noteMatchesTaskFilter,
 	setTaskLineChecked,
-	TASK_FILTERS,
 	taskLineText,
 	type TaskCounts,
-	type TaskFilter,
 } from "./tasks";
 import { t, tn } from "./i18n";
 import { Moment, moment } from "./moment";
@@ -365,9 +362,6 @@ export class NotesListView extends ItemView {
 	// single-column (narrow) layout, where an expanded tree would push the
 	// notes list off screen; the two-column layout always shows it.
 	private tagPanelCollapsed = true;
-	// The Tasks section's filter (see tasks.ts), and its own narrow-layout
-	// fold, both working like their Tags counterparts.
-	private selectedTaskFilter: TaskFilter | null = null;
 	// What the main column shows: the notes, or the open tasks found in them
 	// (renderOpenTasks()), switched from the header. Transient, like the filters.
 	private mode: "notes" | "tasks" = "notes";
@@ -378,7 +372,6 @@ export class NotesListView extends ItemView {
 		(file) => this.extractOpenTasks(file),
 		(file) => [file.stat.mtime, this.app.metadataCache.getFileCache(file)]
 	);
-	private taskPanelCollapsed = true;
 	private currentPage = 1;
 	// Full-text search (see searchIndex.ts). searchQuery is the submitted text
 	// (also what the input shows after a re-render, since render() rebuilds
@@ -614,11 +607,10 @@ export class NotesListView extends ItemView {
 
 		const filteredEntries = allEntries.filter((entry) => {
 			const matchesTag = !this.selectedTag || noteMatchesTagFilter(entry.tags, this.selectedTag);
-			const matchesTasks = !this.selectedTaskFilter || noteMatchesTaskFilter(entry.tasks, this.selectedTaskFilter);
 			const matchesDate = !this.selectedDate || entry.date.format("YYYY-MM-DD") === this.selectedDate;
 			const matchesMonth = !this.selectedMonth || entry.date.format("YYYY-MM") === this.selectedMonth;
 			const matchesSearch = !this.searchMatches || this.searchMatches.has(entry.file.path);
-			return matchesTag && matchesTasks && matchesDate && matchesMonth && matchesSearch;
+			return matchesTag && matchesDate && matchesMonth && matchesSearch;
 		});
 
 		// Pinned notes float to the top, each group still newest-first: allEntries
@@ -654,7 +646,7 @@ export class NotesListView extends ItemView {
 		// to keep the old scroll position, and the browser would clamp it.
 		if (keepScroll) layout.setCssStyles({ minHeight: `${previousHeight}px` });
 		const mainEl = layout.createDiv({ cls: "notes-list-main" });
-		// Where the sidebar's blocks (search, heatmap, filters, tags, tasks) go:
+		// Where the sidebar's blocks (search, heatmap, filters, tags) go:
 		// their own column, or, in the narrow layout, straight into the layout
 		// column next to the notes, where CSS `order` sequences them. Choosing
 		// the parent here replaces a `display: contents` sidebar, which the
@@ -779,7 +771,7 @@ export class NotesListView extends ItemView {
 		// toggled on/off. When nothing is selected, that placeholder pill is
 		// just hidden via CSS (.is-empty) rather than left out of the DOM.
 		const hasActiveFilter = Boolean(
-			this.selectedTag || this.selectedTaskFilter || this.selectedDate || this.selectedMonth || this.searchMatches
+			this.selectedTag || this.selectedDate || this.selectedMonth || this.searchMatches
 		);
 		const activeFilters = sidebar.createDiv({ cls: "notes-list-active-filters" });
 		activeFilters.toggleClass("is-empty", !hasActiveFilter);
@@ -823,13 +815,6 @@ export class NotesListView extends ItemView {
 							void this.render();
 						}
 					),
-			},
-			{
-				title: t("view.tasks"),
-				cls: "notes-task-panel",
-				collapsed: this.taskPanelCollapsed,
-				setCollapsed: (collapsed) => (this.taskPanelCollapsed = collapsed),
-				renderContent: (el) => this.renderTaskFilters(el, allEntries),
 			},
 		]);
 
@@ -1021,14 +1006,14 @@ export class NotesListView extends ItemView {
 		await Promise.all(renders);
 	}
 
-	// The sidebar's filter sections (Tags, Tasks), all built the same way. In
-	// two columns each is one panel, its title above its content. In the
-	// narrow layout the titles become foldable headers side by side, half the
-	// width each, in a two-column grid, and an expanded section's content comes
-	// below them at full width (several stack if several are open). Header and
-	// content are separate elements there, which is why this builds the DOM
-	// per layout rather than leaving it to CSS. Both reuse the tag tree's
-	// panel classes, so they look the same.
+	// The sidebar's filter sections (today only Tags), all built the same way.
+	// In two columns each is one panel, its title above its content. In the
+	// narrow layout the titles become foldable headers side by side, sharing
+	// the width equally (one column per section, so a lone section is full
+	// width), and an expanded section's content comes below them at full width
+	// (several stack if several are open). Header and content are separate
+	// elements there, which is why this builds the DOM per layout rather than
+	// leaving it to CSS. Sections reuse the tag tree's panel classes.
 	private renderFilterSections(
 		sidebar: HTMLElement,
 		narrow: boolean,
@@ -1056,6 +1041,7 @@ export class NotesListView extends ItemView {
 		}
 
 		const grid = sidebar.createDiv({ cls: "notes-list-filter-sections" });
+		grid.setCssProps({ "--nl-filter-section-count": String(sections.length) });
 		for (const section of sections) {
 			const box = grid.createDiv({ cls: `notes-tag-tree-panel notes-filter-section-header ${section.cls}` });
 			box.toggleClass("is-collapsed", section.collapsed);
@@ -1070,30 +1056,6 @@ export class NotesListView extends ItemView {
 			if (section.collapsed) continue;
 			const box = grid.createDiv({ cls: `notes-tag-tree-panel notes-filter-section-content ${section.cls}` });
 			section.renderContent(box.createDiv({ cls: "notes-tag-tree" }));
-		}
-	}
-
-	// The Tasks section's content: one entry per TASK_FILTERS choice, with its
-	// note count across every note in scope (like the tag counts), in the tag
-	// tree's row markup.
-	private renderTaskFilters(container: HTMLElement, allEntries: NoteEntry[]): void {
-		const list = container.createEl("ul", { cls: "notes-tag-tree-list" });
-		for (const filter of TASK_FILTERS) {
-			const label = t(`tasks.${filter}` as const);
-			const count = allEntries.filter((e) => noteMatchesTaskFilter(e.tasks, filter)).length;
-			const row = list.createEl("li", { cls: "notes-tag-tree-item" }).createDiv({ cls: "notes-tag-tree-row" });
-			row.createSpan({ cls: "notes-tag-tree-toggle" });
-			const labelEl = row.createSpan({
-				cls: "notes-tag-tree-label" + (filter === this.selectedTaskFilter ? " is-selected" : ""),
-			});
-			labelEl.createSpan({ text: label });
-			labelEl.createSpan({ text: ` (${count})`, cls: "notes-tag-tree-count" });
-			labelEl.addEventListener("click", () => {
-				this.selectedTaskFilter = filter;
-				this.currentPage = 1;
-				this.taskPanelCollapsed = true;
-				void this.render();
-			});
 		}
 	}
 
@@ -1162,13 +1124,6 @@ export class NotesListView extends ItemView {
 				label: this.selectedTag === UNTAGGED ? t("tags.untagged") : `#${this.selectedTag}`,
 				clearLabel: t("view.clearTag"),
 				clear: resetTo(() => (this.selectedTag = null)),
-			});
-		}
-		if (this.selectedTaskFilter) {
-			filters.push({
-				label: t(`tasks.pill.${this.selectedTaskFilter}` as const),
-				clearLabel: t("view.clearTasks"),
-				clear: resetTo(() => (this.selectedTaskFilter = null)),
 			});
 		}
 		if (this.selectedDate) {

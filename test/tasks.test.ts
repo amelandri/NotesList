@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countTasks, isOpenTaskStatus, noteMatchesTaskFilter, setTaskLineChecked, taskLineText } from "../src/tasks";
+import { countTasks, isOpenTaskStatus, setTaskLineChecked, taskLineText } from "../src/tasks";
 
 describe("isOpenTaskStatus", () => {
 	it("is open for a space and custom statuses, not for completed or cancelled", () => {
@@ -60,23 +60,5 @@ describe("countTasks", () => {
 	it("counts x/X as completed, '-' as cancelled (total only), and any other status as open", () => {
 		const items = [{ task: " " }, { task: "x" }, { task: "X" }, { task: "-" }, { task: "/" }];
 		expect(countTasks(items)).toEqual({ open: 2, done: 2, total: 5 });
-	});
-});
-
-describe("noteMatchesTaskFilter", () => {
-	const onlyCancelled = { open: 0, done: 0, total: 1 };
-	const mixed = { open: 1, done: 2, total: 3 };
-	const none = { open: 0, done: 0, total: 0 };
-
-	it("'any' matches a note with at least one task, even if only cancelled", () => {
-		expect(noteMatchesTaskFilter(onlyCancelled, "any")).toBe(true);
-		expect(noteMatchesTaskFilter(none, "any")).toBe(false);
-	});
-
-	it("'open' and 'done' need at least one task in that state", () => {
-		expect(noteMatchesTaskFilter(mixed, "open")).toBe(true);
-		expect(noteMatchesTaskFilter(mixed, "done")).toBe(true);
-		expect(noteMatchesTaskFilter(onlyCancelled, "open")).toBe(false);
-		expect(noteMatchesTaskFilter(onlyCancelled, "done")).toBe(false);
 	});
 });
