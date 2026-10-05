@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { groupOpenTasks, noteLevelTags, tagCombination, taskGroupTags, type OpenTask } from "../src/openTasks";
+import {
+	groupOpenTasks,
+	noteLevelTags,
+	OpenTaskIndex,
+	tagCombination,
+	tagsByLine,
+	taskGroupTags,
+	type IndexedTask,
+	type OpenTask,
+} from "../src/openTasks";
 
 describe("noteLevelTags", () => {
 	it("keeps frontmatter tags and inline tags off task lines, drops those on task lines", () => {
@@ -12,11 +21,11 @@ describe("noteLevelTags", () => {
 });
 
 describe("taskGroupTags", () => {
-	const inline = [
+	const inline = tagsByLine([
 		{ tag: "#urgent", line: 5 },
 		{ tag: "#call", line: 5 },
 		{ tag: "#project", line: 2 },
-	];
+	]);
 
 	it("uses the task's own tags when its line has any", () => {
 		expect(taskGroupTags(5, inline, ["#work"])).toEqual(["#urgent", "#call"]);
@@ -27,7 +36,7 @@ describe("taskGroupTags", () => {
 	});
 
 	it("leaves a task untagged when neither it nor the note has tags", () => {
-		expect(taskGroupTags(6, [], [])).toEqual([]);
+		expect(taskGroupTags(6, new Map(), [])).toEqual([]);
 	});
 });
 
@@ -80,5 +89,69 @@ describe("groupOpenTasks", () => {
 			[1, 1],
 			[1, 2],
 		]);
+	});
+});
+
+describe("OpenTaskIndex", () => {
+	type File = { path: string; version: number };
+	const tasks = (path: string): IndexedTask[] => [{ line: 1, text: path, tags: [] }];
+
+	function setup(batchSize = 50) {
+		const extracted: string[] = [];
+		let inFlight = 0;
+		let maxInFlight = 0;
+		const index = new OpenTaskIndex<File>(
+			async (file) => {
+				extracted.push(file.path);
+				inFlight++;
+				maxInFlight = Math.max(maxInFlight, inFlight);
+				await Promise.resolve();
+				inFlight--;
+				if (file.path === "broken.md") throw new Error("unreadable");
+				return tasks(file.path);
+			},
+			(file) => [file.version],
+			batchSize
+		);
+		return { index, extracted, maxInFlight: () => maxInFlight };
+	}
+
+	it("extracts each note once, and reuses it while its version stays the same", async () => {
+		const { index, extracted } = setup();
+		const files = [{ path: "a.md", version: 1 }, { path: "b.md", version: 1 }];
+		await index.get(files);
+		const second = await index.get(files);
+		expect(extracted).toEqual(["a.md", "b.md"]);
+		expect(second.get("a.md")).toEqual(tasks("a.md"));
+	});
+
+	it("re-extracts only the notes whose version changed", async () => {
+		const { index, extracted } = setup();
+		await index.get([{ path: "a.md", version: 1 }, { path: "b.md", version: 1 }]);
+		await index.get([{ path: "a.md", version: 2 }, { path: "b.md", version: 1 }]);
+		expect(extracted).toEqual(["a.md", "b.md", "a.md"]);
+	});
+
+	it("runs extractions in batches, not all at once", async () => {
+		const { index, maxInFlight } = setup(2);
+		await index.get([1, 2, 3, 4, 5].map((n) => ({ path: `${n}.md`, version: 1 })));
+		expect(maxInFlight()).toBe(2);
+	});
+
+	it("skips a note that fails, without caching it", async () => {
+		const { index, extracted } = setup();
+		const result = await index.get([{ path: "broken.md", version: 1 }, { path: "a.md", version: 1 }]);
+		expect(result.has("broken.md")).toBe(false);
+		expect(result.get("a.md")).toEqual(tasks("a.md"));
+		await index.get([{ path: "broken.md", version: 1 }]);
+		expect(extracted.filter((p) => p === "broken.md")).toHaveLength(2);
+	});
+
+	it("forgets pruned notes", async () => {
+		const { index, extracted } = setup();
+		await index.get([{ path: "a.md", version: 1 }]);
+		index.prune(new Set());
+		await index.get([{ path: "a.md", version: 1 }]);
+		expect(extracted).toEqual(["a.md", "a.md"]);
 	});
 });

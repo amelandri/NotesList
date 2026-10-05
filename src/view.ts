@@ -25,7 +25,16 @@ import {
 	UNTAGGED,
 	type TagFilter,
 } from "./tagTree";
-import { groupOpenTasks, noteLevelTags, taskGroupTags, type LineTag, type OpenTask } from "./openTasks";
+import {
+	groupOpenTasks,
+	noteLevelTags,
+	OpenTaskIndex,
+	tagsByLine,
+	taskGroupTags,
+	type IndexedTask,
+	type LineTag,
+	type OpenTask,
+} from "./openTasks";
 import {
 	countTasks,
 	isOpenTaskStatus,
@@ -362,6 +371,13 @@ export class NotesListView extends ItemView {
 	// What the main column shows: the notes, or the open tasks found in them
 	// (renderOpenTasks()), switched from the header. Transient, like the filters.
 	private mode: "notes" | "tasks" = "notes";
+	// Open tasks per note, re-extracted only when a note changes (see
+	// OpenTaskIndex). Its version also tracks the metadata cache object, since
+	// task lines and tags come from there.
+	private openTaskIndex = new OpenTaskIndex<TFile>(
+		(file) => this.extractOpenTasks(file),
+		(file) => [file.stat.mtime, this.app.metadataCache.getFileCache(file)]
+	);
 	private taskPanelCollapsed = true;
 	private currentPage = 1;
 	// Full-text search (see searchIndex.ts). searchQuery is the submitted text
@@ -892,6 +908,34 @@ export class NotesListView extends ItemView {
 		}
 	}
 
+	// A note's open tasks, for OpenTaskIndex: task lines from Obsidian's
+	// metadata, their text from the file. Each is grouped by its own tags when
+	// it has some, else by the note's own (frontmatter, plus inline tags off any
+	// task line); both from Obsidian's index, so tags are recognized exactly as
+	// Obsidian does.
+	private async extractOpenTasks(file: TFile): Promise<IndexedTask[]> {
+		const cache = this.app.metadataCache.getFileCache(file);
+		const taskItems = (cache?.listItems ?? []).filter((item) => item.task !== undefined);
+		const openItems = taskItems.filter((item) => isOpenTaskStatus(item.task ?? ""));
+		if (openItems.length === 0) return [];
+		const inlineTags: LineTag[] = (cache?.tags ?? []).map((t) => ({ tag: t.tag, line: t.position.start.line }));
+		const byLine = tagsByLine(inlineTags);
+		const noteTags = noteLevelTags(
+			parseFrontMatterTags(cache?.frontmatter) ?? [],
+			inlineTags,
+			new Set(taskItems.map((item) => item.position.start.line))
+		);
+		const lines = (await this.app.vault.cachedRead(file)).split("\n");
+		return openItems.map((item) => {
+			const line = item.position.start.line;
+			return {
+				line,
+				text: stripInlineTags(taskLineText(lines[line] ?? "")).trim(),
+				tags: taskGroupTags(line, byLine, noteTags),
+			};
+		});
+	}
+
 	// The main column in tasks mode: every open task of `entries` (the list's
 	// own, already filtered by the sidebar), grouped by the exact combination
 	// of its note's tags (groupOpenTasks()). Only notes with open tasks are
@@ -901,33 +945,18 @@ export class NotesListView extends ItemView {
 	// tasks, not whole notes.
 	private async renderOpenTasks(container: HTMLElement, entries: NoteEntry[]): Promise<void> {
 		const listEl = container.createDiv({ cls: "notes-list-open-tasks" });
-		const collected = await Promise.all(
-			entries.map(async (entry, noteIndex): Promise<Array<OpenTask<NoteEntry>>> => {
-				if (entry.tasks.open === 0) return [];
-				const cache = this.app.metadataCache.getFileCache(entry.file);
-				const taskItems = (cache?.listItems ?? []).filter((item) => item.task !== undefined);
-				const items = taskItems.filter((item) => isOpenTaskStatus(item.task ?? ""));
-				if (items.length === 0) return [];
-				// Group by the task's own tags when it has some, else by the note's
-				// own (frontmatter, plus inline tags off any task line); both from
-				// Obsidian's index, so tags are recognized exactly as Obsidian does.
-				const inlineTags: LineTag[] = (cache?.tags ?? []).map((t) => ({ tag: t.tag, line: t.position.start.line }));
-				const noteTags = noteLevelTags(
-					parseFrontMatterTags(cache?.frontmatter) ?? [],
-					inlineTags,
-					new Set(taskItems.map((item) => item.position.start.line))
-				);
-				const lines = (await this.app.vault.cachedRead(entry.file)).split("\n");
-				return items.map((item) => ({
-					tags: taskGroupTags(item.position.start.line, inlineTags, noteTags),
-					noteIndex,
-					line: item.position.start.line,
-					text: stripInlineTags(taskLineText(lines[item.position.start.line] ?? "")).trim(),
-					note: entry,
-				}));
-			})
-		);
-		const groups = groupOpenTasks(collected.flat());
+		// Only notes with open tasks, extracted through the index (re-read only
+		// when they change). Notes that left the scope are dropped from it.
+		const withTasks = entries.filter((entry) => entry.tasks.open > 0);
+		const tasksByPath = await this.openTaskIndex.get(withTasks.map((entry) => entry.file));
+		this.openTaskIndex.prune(new Set(this.cachedEntries.map((entry) => entry.file.path)));
+		const collected: Array<OpenTask<NoteEntry>> = [];
+		withTasks.forEach((entry, noteIndex) => {
+			for (const task of tasksByPath.get(entry.file.path) ?? []) {
+				collected.push({ ...task, noteIndex, note: entry });
+			}
+		});
+		const groups = groupOpenTasks(collected);
 		if (groups.length === 0) {
 			const filters = this.activeFilters();
 			listEl.createEl("p", {
