@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The "Tasks" section in the sidebar (filter by any / open / completed tasks). The "Open tasks" view now covers open tasks; the task counter on each note stays.
 
+### Fixed
+
+- On phones, the end of the notes list and of the open tasks list is no longer hidden behind Obsidian's bottom toolbar: the view leaves room for it, as Obsidian's own views do.
+
 ## [0.2.5] - 2026-10-04
 
 ### Added

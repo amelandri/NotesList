@@ -54,6 +54,12 @@
 	align-items: flex-start;
 	gap: 3rem;
 	padding: var(--size-4-4);
+	/* Room for Obsidian's floating toolbar on phones, which sits over the
+	   bottom of every view: --view-bottom-spacing is Obsidian's own measure of
+	   it (toolbar height plus the screen's safe area), and 0 wherever nothing
+	   overlaps (desktop, tablet). Obsidian applies the matching top offset to
+	   every view by itself, but leaves the bottom to each view. */
+	padding-bottom: calc(var(--size-4-4) + var(--view-bottom-spacing, 0px));
 }
 
 .notes-list-main {
@@ -683,8 +689,11 @@
 	align-items: stretch;
 	gap: var(--size-4-4);
 	/* No inset of its own: on a phone the pane's edge is already the screen's,
-	   and every pixel of width goes to the notes and the heatmap. */
+	   and every pixel of width goes to the notes and the heatmap. Except at
+	   the bottom: room to scroll the last note or task clear of Obsidian's
+	   floating toolbar (see .notes-list-layout above). */
 	padding: 0;
+	padding-bottom: calc(var(--size-4-4) + var(--view-bottom-spacing, 0px));
 }
 
 .notes-list-view.is-narrow .notes-list-layout > * {
