@@ -276,7 +276,7 @@ The note body (`.notes-list-content`, plus its paragraphs' line height), file na
 
 ### Text selection
 
-Obsidian sets `body { user-select: none }` globally (confirmed in the app's own `app.css`) and only re-enables it on its own reading/editing views and `[contenteditable]` elements — a custom `ItemView` like this one isn't covered by that allowlist by default. `.notes-list-item` opts back into `user-select: text` explicitly for that reason. Any new custom sub-view added here that should have selectable text needs the same opt-in.
+Obsidian sets `body { user-select: none }` globally (confirmed in the app's own `app.css`) and only re-enables it on its own reading/editing views and `[contenteditable]` elements — a custom `ItemView` like this one isn't covered by that allowlist by default. `.notes-list-item` and `.notes-list-open-tasks` (the open-tasks view, whose tasks sit outside any note item) opt back into `user-select: text` explicitly for that reason. Any new custom sub-view added here that should have selectable text needs the same opt-in.
 
 ### Known limitations (identified, not fixed)
 

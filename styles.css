@@ -204,6 +204,13 @@
 	margin-bottom: var(--size-4-8);
 }
 
+/* Selectable task text: Obsidian sets `body { user-select: none }` and only
+   re-enables it in its own views, so like .notes-list-item this opts back in. */
+.notes-list-open-tasks {
+	user-select: text;
+	-webkit-user-select: text;
+}
+
 .notes-list-task-group-header {
 	display: flex;
 	align-items: baseline;
