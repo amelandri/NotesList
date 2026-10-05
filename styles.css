@@ -164,7 +164,9 @@
    date group headers, then the tasks as a Markdown task list, each ending
    with a small link to its note. */
 /* The open-tasks view's two sections ("To do", "Waiting for others"), each
-   holding its own tag groups. */
+   holding its own tag groups. Their header is the compact boxed label, and
+   the tag groups' headers inside are the large accent titles (the user
+   swapped the two styles). */
 .notes-list-task-section + .notes-list-task-section {
 	margin-top: var(--size-4-12);
 }
@@ -174,23 +176,27 @@
 	align-items: baseline;
 	justify-content: space-between;
 	gap: var(--size-4-2);
-	margin-bottom: var(--size-4-3);
-	padding-bottom: var(--size-4-2);
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: var(--size-4-8);
+	padding: 0.6rem 0.7rem 0.5rem;
+	border-radius: var(--radius-s);
+	background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	color: var(--text-normal);
+	text-transform: uppercase;
 }
 
-/* Larger than the tag groups' headers and in the accent color, so the two
-   sections stand out as the top level of the list. */
+/* Two classes, to win over Obsidian's own h4 rule. */
 .notes-list-view .notes-list-task-section-title {
 	margin: 0;
-	font-size: var(--h2-size);
-	color: var(--text-accent);
-	text-transform: uppercase;
+	font-size: inherit;
+	font-weight: inherit;
+	color: inherit;
 }
 
 .notes-list-task-section-count {
 	flex-shrink: 0;
-	font-size: var(--font-ui-small);
+	font-weight: normal;
 	color: var(--text-muted);
 }
 
@@ -204,12 +210,14 @@
 	justify-content: space-between;
 	gap: var(--size-4-2);
 	margin-bottom: var(--size-4-3);
-	padding: 0.6rem 0.7rem 0.5rem;
-	border-radius: var(--radius-s);
-	background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
-	font-size: var(--font-ui-small);
+	padding-bottom: var(--size-4-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.notes-list-task-group-title {
+	font-size: var(--h2-size);
 	font-weight: 600;
-	color: var(--text-normal);
+	color: var(--text-accent);
 }
 
 .notes-list-task-group-separator {
@@ -219,7 +227,7 @@
 
 .notes-list-task-group-count {
 	flex-shrink: 0;
-	font-weight: normal;
+	font-size: var(--font-ui-small);
 	color: var(--text-muted);
 }
 
