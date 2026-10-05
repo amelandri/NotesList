@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTagTree, isCollapsedByDefault, noteMatchesTagFilter, tagMatchesFilter, UNTAGGED } from "../src/tagTree";
+import { buildTagTree, isCollapsedByDefault, noteMatchesTagFilter, tagMatchesFilter, uniqueTags, UNTAGGED } from "../src/tagTree";
 
 describe("noteMatchesTagFilter", () => {
 	it("with UNTAGGED, matches only notes with no tags at all", () => {
@@ -101,5 +101,11 @@ describe("isCollapsedByDefault", () => {
 
 	it('"all" never collapses anything, however deep', () => {
 		for (const depth of [1, 2, 3, 10]) expect(isCollapsedByDefault(depth, "all")).toBe(false);
+	});
+});
+
+describe("uniqueTags", () => {
+	it("dedupes case-insensitively, keeping the first-seen casing and order", () => {
+		expect(uniqueTags(["#Project", "#idea", "#project", "#idea"])).toEqual(["#Project", "#idea"]);
 	});
 });

@@ -10,7 +10,6 @@ import {
 	stripFrontmatter,
 	stripInlineTags,
 	truncateMarkdown,
-	uniqueTags,
 } from "../src/view";
 
 describe("cutAtPreviewMarker", () => {
@@ -95,12 +94,6 @@ describe("stripInlineTags", () => {
 
 	it("handles non-ASCII letters", () => {
 		expect(stripInlineTags("Oggi #attività fatta")).toBe("Oggi fatta");
-	});
-});
-
-describe("uniqueTags", () => {
-	it("dedupes case-insensitively, keeping the first-seen casing and order", () => {
-		expect(uniqueTags(["#Project", "#idea", "#project", "#idea"])).toEqual(["#Project", "#idea"]);
 	});
 });
 

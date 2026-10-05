@@ -24,6 +24,15 @@ export const NO_TASKS: TaskCounts = { open: 0, done: 0, total: 0 };
 // "x"/"X" is completed and "-" is cancelled (counted in neither group, only in
 // the total); every other status, " " and custom ones such as "/" (in
 // progress) alike, is still open.
+export function isDoneTaskStatus(status: string): boolean {
+	return status === "x" || status === "X";
+}
+
+/** Still to do: any status but completed ("x"/"X") and cancelled ("-"), so " " and custom ones like "/" alike. */
+export function isOpenTaskStatus(status: string): boolean {
+	return !isDoneTaskStatus(status) && status !== "-";
+}
+
 export function countTasks(listItems: TaskListItem[] | undefined): TaskCounts {
 	if (!listItems) return NO_TASKS;
 	let open = 0;
@@ -32,8 +41,8 @@ export function countTasks(listItems: TaskListItem[] | undefined): TaskCounts {
 	for (const item of listItems) {
 		if (item.task === undefined) continue;
 		total++;
-		if (item.task === "x" || item.task === "X") done++;
-		else if (item.task !== "-") open++;
+		if (isDoneTaskStatus(item.task)) done++;
+		else if (isOpenTaskStatus(item.task)) open++;
 	}
 	return { open, done, total };
 }
@@ -47,6 +56,12 @@ export function noteMatchesTaskFilter(counts: TaskCounts, filter: TaskFilter): b
 // A task line: optional indentation and blockquote/callout markers, a list
 // marker ("-", "*", "+", "1." or "1)"), then "[<status>]".
 const TASK_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[)([^\]])(\])/;
+
+/** A task line's own text: no indentation, blockquote/callout or list marker, and no "[ ]" checkbox. */
+export function taskLineText(line: string): string {
+	const match = TASK_LINE.exec(line);
+	return match ? line.slice(match[0].length).trim() : line.trim();
+}
 
 /**
  * `line` with its task checked ("x") or unchecked (" "). Returns null when it

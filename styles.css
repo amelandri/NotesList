@@ -120,6 +120,84 @@
 	min-width: 0;
 }
 
+/* Notes / Open tasks switch (the header's title). Segmented: one rounded
+   frame, the active half filled. As tall as the new note button
+   (--nl-new-note-button-height), so the header row, and with it the sidebar's
+   alignment (--nl-header-height), is unchanged. Two classes on the button
+   rules, to win over Obsidian's `button:not(.clickable-icon)` reset. */
+.notes-list-mode-switch {
+	display: inline-flex;
+	height: var(--nl-new-note-button-height);
+	padding: 2px;
+	border-radius: var(--radius-m);
+	background-color: var(--background-modifier-hover);
+}
+
+.notes-list-mode-switch .notes-list-mode-button {
+	height: 100%;
+	padding: 0 var(--size-4-3);
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.notes-list-mode-switch .notes-list-mode-button:hover {
+	color: var(--text-normal);
+}
+
+.notes-list-mode-switch .notes-list-mode-button.is-active {
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+}
+
+/* Open tasks mode: one block per tag combination, its header styled like the
+   date group headers, then the tasks as a Markdown task list, each ending
+   with a small link to its note. */
+.notes-list-task-group {
+	margin-bottom: var(--size-4-8);
+}
+
+.notes-list-task-group-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--size-4-2);
+	margin-bottom: var(--size-4-3);
+	padding: 0.6rem 0.7rem 0.5rem;
+	border-radius: var(--radius-s);
+	background: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.notes-list-task-group-count {
+	flex-shrink: 0;
+	font-weight: normal;
+	color: var(--text-muted);
+}
+
+.notes-list-task-group .notes-list-content li.task-list-item {
+	margin-bottom: var(--size-2-3);
+}
+
+.notes-list-task-source {
+	margin-inline-start: var(--size-4-2);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.notes-list-task-source:hover {
+	color: var(--text-accent-hover);
+	text-decoration: underline;
+}
+
 /* Full-text search form at the top of the sidebar: the field takes the
    remaining width, the button keeps its natural size. .search-input-container
    is Obsidian's own markup for a search field (search icon, built-in clear

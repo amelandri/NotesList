@@ -17,17 +17,21 @@ import type { ContentDisplayMode, TagTreeExpandLevel } from "./settings";
 import { renderHeatmap, type HeatmapSelection } from "./heatmap";
 import {
 	buildTagTree,
+	uniqueTags,
 	isCollapsedByDefault,
 	noteMatchesTagFilter,
 	renderTagTree,
 	UNTAGGED,
 	type TagFilter,
 } from "./tagTree";
+import { groupOpenTasks, type OpenTask } from "./openTasks";
 import {
 	countTasks,
+	isOpenTaskStatus,
 	noteMatchesTaskFilter,
 	setTaskLineChecked,
 	TASK_FILTERS,
+	taskLineText,
 	type TaskCounts,
 	type TaskFilter,
 } from "./tasks";
@@ -133,18 +137,6 @@ export function stripInlineTags(body: string): string {
 		if (rest) out.push(indent + rest);
 	}
 	return out.join("\n");
-}
-
-// A note's tags (frontmatter "tags" plus inline ones, as getAllTags() returns
-// them, "#"-prefixed and once per occurrence) deduplicated case-insensitively,
-// keeping each tag's first-seen casing and order, like the tag tree does.
-export function uniqueTags(tags: string[]): string[] {
-	const seen = new Map<string, string>();
-	for (const tag of tags) {
-		const key = tag.toLowerCase();
-		if (!seen.has(key)) seen.set(key, tag);
-	}
-	return [...seen.values()];
 }
 
 // [start, end) character ranges of every fenced code block and table in
@@ -366,6 +358,9 @@ export class NotesListView extends ItemView {
 	// The Tasks section's filter (see tasks.ts), and its own narrow-layout
 	// fold, both working like their Tags counterparts.
 	private selectedTaskFilter: TaskFilter | null = null;
+	// What the main column shows: the notes, or the open tasks found in them
+	// (renderOpenTasks()), switched from the header. Transient, like the filters.
+	private mode: "notes" | "tasks" = "notes";
 	private taskPanelCollapsed = true;
 	private currentPage = 1;
 	// Full-text search (see searchIndex.ts). searchQuery is the submitted text
@@ -653,7 +648,24 @@ export class NotesListView extends ItemView {
 
 		const header = mainEl.createDiv({ cls: "notes-list-header" });
 		const titleGroup = header.createDiv({ cls: "notes-list-header-title-group" });
-		titleGroup.createEl("h4", { text: t("view.notes"), cls: "notes-list-panel-title" });
+		// Notes / Tasks switch, in place of a plain "Notes" title.
+		const modeSwitch = titleGroup.createDiv({ cls: "notes-list-mode-switch", attr: { role: "group" } });
+		for (const [mode, label] of [
+			["notes", t("view.modeNotes")],
+			["tasks", t("view.modeTasks")],
+		] as const) {
+			const button = modeSwitch.createEl("button", {
+				text: label,
+				cls: "notes-list-mode-button" + (mode === this.mode ? " is-active" : ""),
+				attr: { type: "button", "aria-pressed": String(mode === this.mode) },
+			});
+			button.addEventListener("click", () => {
+				if (mode === this.mode) return;
+				this.mode = mode;
+				this.currentPage = 1;
+				void this.render();
+			});
+		}
 
 		// Two columns only: the narrow layout hides it in favor of the icon-only
 		// button next to search (see renderSearchForm()).
@@ -669,7 +681,9 @@ export class NotesListView extends ItemView {
 		// content fill is the slow, async part of render(), and the search field
 		// shouldn't vanish from under the user's cursor while it runs.
 		let noteRenders: Promise<void>[] = [];
-		if (visibleEntries.length === 0) {
+		if (this.mode === "tasks") {
+			noteRenders = [this.renderOpenTasks(mainEl, visibleEntries)];
+		} else if (visibleEntries.length === 0) {
 			mainEl.createEl("p", {
 				text: this.buildEmptyMessage(),
 				cls: "notes-list-empty",
@@ -848,6 +862,16 @@ export class NotesListView extends ItemView {
 			return;
 		}
 
+		await this.writeTaskState(file, line, checkbox);
+	}
+
+	// Saves a task checkbox's new state to line `line` of `file`, shared by the
+	// notes list (toggleTask()) and the open-tasks view. setTaskLineChecked()
+	// refuses unless the line is a task currently in the opposite state; then
+	// nothing is written, the checkbox is reverted and a Notice says why. The
+	// write's own vault events refresh the view.
+	private async writeTaskState(file: TFile, line: number, checkbox: HTMLInputElement): Promise<void> {
+		const checked = checkbox.checked;
 		let written = false;
 		try {
 			await this.app.vault.process(file, (data) => {
@@ -862,9 +886,100 @@ export class NotesListView extends ItemView {
 			console.error("Notes List: could not update the task", error);
 		}
 		if (!written) {
-			undo();
+			checkbox.checked = !checked;
 			new Notice(t("view.taskUpdateFailed"));
 		}
+	}
+
+	// The main column in tasks mode: every open task of `entries` (the list's
+	// own, already filtered by the sidebar), grouped by the exact combination
+	// of its note's tags (groupOpenTasks()). Only notes with open tasks are
+	// read. Each group renders as one Markdown task list, so checkboxes, links
+	// and formatting are Obsidian's own, and the n-th checkbox is the group's
+	// n-th task, whose line is known exactly. No pagination: the list holds
+	// tasks, not whole notes.
+	private async renderOpenTasks(container: HTMLElement, entries: NoteEntry[]): Promise<void> {
+		const listEl = container.createDiv({ cls: "notes-list-open-tasks" });
+		const collected = await Promise.all(
+			entries.map(async (entry, noteIndex): Promise<Array<OpenTask<NoteEntry>>> => {
+				if (entry.tasks.open === 0) return [];
+				const items = (this.app.metadataCache.getFileCache(entry.file)?.listItems ?? []).filter(
+					(item) => item.task !== undefined && isOpenTaskStatus(item.task)
+				);
+				if (items.length === 0) return [];
+				const lines = (await this.app.vault.cachedRead(entry.file)).split("\n");
+				return items.map((item) => ({
+					tags: entry.tags,
+					noteIndex,
+					line: item.position.start.line,
+					text: stripInlineTags(taskLineText(lines[item.position.start.line] ?? "")).trim(),
+					note: entry,
+				}));
+			})
+		);
+		const groups = groupOpenTasks(collected.flat());
+		if (groups.length === 0) {
+			const filters = this.activeFilters();
+			listEl.createEl("p", {
+				text:
+					filters.length === 0
+						? t("tasksView.empty")
+						: t("tasksView.emptyFiltered", { filters: filters.map((f) => f.label).join(", ") }),
+				cls: "notes-list-empty",
+			});
+			return;
+		}
+
+		const renders: Promise<void>[] = [];
+		for (const group of groups) {
+			const groupEl = listEl.createDiv({ cls: "notes-list-task-group" });
+			const header = groupEl.createDiv({ cls: "notes-list-task-group-header" });
+			header.createSpan({ text: group.tags.length > 0 ? group.tags.join(" + ") : t("tags.untagged") });
+			header.createSpan({ text: tn("tasksView.groupCount", group.tasks.length), cls: "notes-list-task-group-count" });
+			const body = groupEl.createDiv({ cls: "notes-list-content markdown-rendered" });
+			body.addEventListener("click", (evt) => {
+				const target = evt.target;
+				if (!(target instanceof HTMLInputElement) || !target.matches("input.task-list-item-checkbox")) return;
+				const own = Array.from(body.querySelectorAll("input.task-list-item-checkbox")).filter(
+					(el) => !el.closest(".internal-embed")
+				);
+				const task = group.tasks[own.indexOf(target)];
+				if (!task || target.closest(".internal-embed")) {
+					target.checked = !target.checked;
+					return;
+				}
+				void this.writeTaskState(task.note.file, task.line, target);
+			});
+			const markdown = group.tasks.map((task) => `- [ ] ${task.text}`).join("\n");
+			renders.push(
+				MarkdownRenderer.render(this.app, markdown, body, group.tasks[0].note.file.path, this.markdownComponent).then(
+					() => {
+						// The note each task comes from, as a link at the end of its row.
+						const rows = Array.from(body.querySelectorAll("li.task-list-item")).filter(
+							(li) => !li.closest(".internal-embed")
+						);
+						rows.forEach((row, index) => {
+							const task = group.tasks[index];
+							if (!task) return;
+							const { file, date } = task.note;
+							const label =
+								date.format("YYYY-MM-DD HH:mm") + (this.shouldShowNoteName(file) ? ` · ${file.basename}` : "");
+							const link = row.createEl("a", {
+								text: label,
+								cls: "notes-list-task-source internal-link",
+								href: file.path,
+								attr: { "aria-label": t("tasksView.openNote", { note: file.basename }) },
+							});
+							link.addEventListener("click", (evt) => {
+								evt.preventDefault();
+								void this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
+							});
+						});
+					}
+				)
+			);
+		}
+		await Promise.all(renders);
 	}
 
 	// The sidebar's filter sections (Tags, Tasks), all built the same way. In

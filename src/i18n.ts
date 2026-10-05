@@ -24,7 +24,12 @@ const en = {
 
 	// View
 	"view.title": "Notes list",
-	"view.notes": "Notes",
+	"view.modeNotes": "Notes",
+	"view.modeTasks": "Open tasks",
+	"tasksView.empty": "No open tasks in these notes.",
+	"tasksView.emptyFiltered": "No open tasks match: {filters}.",
+	"tasksView.groupCount": { one: "{count} task", other: "{count} tasks" },
+	"tasksView.openNote": "Open {note}",
 	"view.activity": "Activity",
 	"view.tags": "Tags",
 	"view.tasks": "Tasks",
@@ -134,7 +139,12 @@ const it: Translations = {
 	"ribbon.open": "Apri l'elenco delle note",
 
 	"view.title": "Elenco note",
-	"view.notes": "Note",
+	"view.modeNotes": "Note",
+	"view.modeTasks": "Task aperti",
+	"tasksView.empty": "Nessun task aperto in queste note.",
+	"tasksView.emptyFiltered": "Nessun task aperto corrisponde a: {filters}.",
+	"tasksView.groupCount": { one: "{count} task", other: "{count} task" },
+	"tasksView.openNote": "Apri {note}",
 	"view.activity": "Attività",
 	"view.tags": "Tag",
 	"view.tasks": "Task",

@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { countTasks, noteMatchesTaskFilter, setTaskLineChecked } from "../src/tasks";
+import { countTasks, isOpenTaskStatus, noteMatchesTaskFilter, setTaskLineChecked, taskLineText } from "../src/tasks";
+
+describe("isOpenTaskStatus", () => {
+	it("is open for a space and custom statuses, not for completed or cancelled", () => {
+		expect(isOpenTaskStatus(" ")).toBe(true);
+		expect(isOpenTaskStatus("/")).toBe(true);
+		expect(isOpenTaskStatus("x")).toBe(false);
+		expect(isOpenTaskStatus("X")).toBe(false);
+		expect(isOpenTaskStatus("-")).toBe(false);
+	});
+});
+
+describe("taskLineText", () => {
+	it("drops indentation, list marker and checkbox", () => {
+		expect(taskLineText("    - [ ] buy **milk** [[Shop]]")).toBe("buy **milk** [[Shop]]");
+		expect(taskLineText("1. [/] numbered")).toBe("numbered");
+		expect(taskLineText("> - [ ] in a callout")).toBe("in a callout");
+	});
+});
 
 describe("setTaskLineChecked", () => {
 	it("checks and unchecks a plain task, keeping the rest of the line", () => {

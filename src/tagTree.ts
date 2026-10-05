@@ -17,6 +17,18 @@ function normalizeTag(tag: string): string {
 // Obsidian treats tags case-insensitively (its own tag pane merges "#Project"
 // and "#project" into one), so matching and grouping both compare on this
 // lowercased form rather than the tag's literal casing.
+// A note's tags (frontmatter "tags" plus inline ones, as getAllTags() returns
+// them, "#"-prefixed and once per occurrence) deduplicated case-insensitively,
+// keeping each tag's first-seen casing and order, like the tag tree does.
+export function uniqueTags(tags: string[]): string[] {
+	const seen = new Map<string, string>();
+	for (const tag of tags) {
+		const key = tag.toLowerCase();
+		if (!seen.has(key)) seen.set(key, tag);
+	}
+	return [...seen.values()];
+}
+
 export function tagMatchesFilter(tag: string, filter: string): boolean {
 	const normalized = normalizeTag(tag).toLowerCase();
 	const normalizedFilter = filter.toLowerCase();
