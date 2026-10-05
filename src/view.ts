@@ -39,6 +39,7 @@ import {
 } from "./openTasks";
 import {
 	countTasks,
+	keywordRanges,
 	isOpenTaskStatus,
 	setTaskLineChecked,
 	taskLineText,
@@ -200,6 +201,41 @@ export function findUnbreakableBlocks(body: string): Array<[number, number]> {
 // Obsidian's reading view doesn't show it, and it can't collide with real
 // content the way a "-----" (a horizontal rule) would.
 const PREVIEW_MARKER = /<!--\s*more\s*-->/i;
+
+// Wraps every "@keyword" (keywordRanges()) in the tasks rendered in
+// `container` in a span.notes-list-task-keyword, which styles.css colors, in
+// the notes list and the open-tasks view alike. Only a task's own text: not
+// its nested sub-lists (a nested task is a task item of its own and gets its
+// own pass), nor code, links or embedded notes.
+function highlightTaskKeywords(container: HTMLElement): void {
+	for (const item of Array.from(container.querySelectorAll("li.task-list-item"))) {
+		if (item.closest(".internal-embed")) continue;
+		const walker = item.ownerDocument.createTreeWalker(item, NodeFilter.SHOW_TEXT, {
+			// Skip text inside code, a link or a nested list of this task; the
+			// list the task itself sits in is outside it, so it doesn't count.
+			acceptNode: (node) => {
+				const blocker = node.parentElement?.closest("code, pre, a, ul, ol");
+				return blocker && item.contains(blocker) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+			},
+		});
+		const textNodes: Text[] = [];
+		for (let node = walker.nextNode(); node; node = walker.nextNode()) textNodes.push(node as Text);
+		for (const node of textNodes) {
+			const text = node.data;
+			const ranges = keywordRanges(text);
+			if (ranges.length === 0) continue;
+			const fragment = createFragment();
+			let last = 0;
+			for (const [start, end] of ranges) {
+				fragment.appendText(text.slice(last, start));
+				fragment.createSpan({ text: text.slice(start, end), cls: "notes-list-task-keyword" });
+				last = end;
+			}
+			fragment.appendText(text.slice(last));
+			node.replaceWith(fragment);
+		}
+	}
+}
 
 /**
  * What a note's body shows in the list. `truncated` says whether anything was
@@ -1010,6 +1046,7 @@ export class NotesListView extends ItemView {
 		return (
 			MarkdownRenderer.render(this.app, markdown, body, group.tasks[0].note.file.path, this.markdownComponent).then(
 				() => {
+					highlightTaskKeywords(body);
 					// The note each task comes from, as a link at the end of its row.
 					const rows = Array.from(body.querySelectorAll("li.task-list-item")).filter(
 						(li) => !li.closest(".internal-embed")
@@ -1394,5 +1431,6 @@ export class NotesListView extends ItemView {
 		}
 
 		await MarkdownRenderer.render(this.app, preview.text, contentEl, file.path, this.markdownComponent);
+		highlightTaskKeywords(contentEl);
 	}
 }

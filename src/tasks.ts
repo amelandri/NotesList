@@ -57,6 +57,22 @@ export function hasWaitingKeyword(text: string): boolean {
 	return /(^|[^\w@])@waiting(?![\w-])/i.test(text);
 }
 
+/**
+ * [start, end) ranges of the "@keywords" in a task's text: "@" plus letters,
+ * digits, "_" or "-" (e.g. "@waiting", "@anna"). Only at the start or after a
+ * character that can't be part of a word or address, so "me@example.com"
+ * isn't one. The view colors them (highlightTaskKeywords() in view.ts).
+ */
+export function keywordRanges(text: string): Array<[number, number]> {
+	const ranges: Array<[number, number]> = [];
+	const pattern = /(^|[^\p{L}\p{N}_@.])(@[\p{L}\p{N}_][\p{L}\p{N}_-]*)/gu;
+	for (const match of text.matchAll(pattern)) {
+		const start = (match.index ?? 0) + match[1].length;
+		ranges.push([start, start + match[2].length]);
+	}
+	return ranges;
+}
+
 /** A task line's own text: no indentation, blockquote/callout or list marker, and no "[ ]" checkbox. */
 export function taskLineText(line: string): string {
 	const match = TASK_LINE.exec(line);

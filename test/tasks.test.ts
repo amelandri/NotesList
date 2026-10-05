@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { countTasks, hasWaitingKeyword, isOpenTaskStatus, setTaskLineChecked, taskLineText } from "../src/tasks";
+import { countTasks, hasWaitingKeyword, isOpenTaskStatus, keywordRanges, setTaskLineChecked, taskLineText } from "../src/tasks";
+
+describe("keywordRanges", () => {
+	const words = (text: string) => keywordRanges(text).map(([start, end]) => text.slice(start, end));
+
+	it("finds every @keyword, at the start or after a space or punctuation", () => {
+		expect(words("@waiting offer to @anna-b (@call), done")).toEqual(["@waiting", "@anna-b", "@call"]);
+	});
+
+	it("handles accented letters and digits", () => {
+		expect(words("chiedi a @università e @q4")).toEqual(["@università", "@q4"]);
+	});
+
+	it("skips e-mail addresses and a bare @", () => {
+		expect(words("write to me@example.com or a.b@x.it, @ alone")).toEqual([]);
+	});
+});
 
 describe("hasWaitingKeyword", () => {
 	it("finds @waiting anywhere in the text, in any case", () => {

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@keywords` in tasks (e.g. `@waiting`, `@anna`) are highlighted in an orange tuned to the accent color, in the notes list and in the "Open tasks" view. The color can be changed through `--notes-list-keyword-color`.
 - An "Open tasks" view, switched from the notes header: every open task in the listed notes, in one list, grouped by the exact combination of their tags (e.g. "#alpha + #work"): a task's own tags, written on its line, when it has any, otherwise its note's. Tasks with no tags at all get their own group. Tasks are split into two sections, each grouped by tags under large, accent-colored tag titles: "To do", and "Waiting for others" for tasks containing the `@waiting` keyword. In a group's title only the tags are bold, not the "+" between them. Tasks can be checked off right there, their text can be selected and copied, and each links to its note. The sidebar's search and filters narrow it too.
 
 ### Removed

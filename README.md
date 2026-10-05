@@ -100,6 +100,16 @@ body {
 }
 ```
 
+## Task keywords
+
+Words starting with `@` in a task, like `@waiting` or `@anna`, are highlighted in an orange blended with your accent color, both in the notes list and in the open tasks view (e-mail addresses, code and links are left alone). To pick another color, set `--notes-list-keyword-color` in a CSS snippet:
+
+```css
+body {
+	--notes-list-keyword-color: var(--color-orange);
+}
+```
+
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md).
