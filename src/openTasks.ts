@@ -1,14 +1,15 @@
 import { uniqueTags } from "./tagTree";
 
 // The open-tasks view's grouping (see renderOpenTasks() in view.ts): every
-// open task goes under the exact combination of its note's tags, so a note
-// tagged #work and #alpha lands in "#work + #alpha", apart from one tagged
-// #work alone, and each task appears exactly once. Nested tags count whole
+// open task goes under the exact combination of its tags, so tags #work and
+// #alpha land in "#alpha + #work", apart from #work alone, and each task
+// appears exactly once. A task's tags are its own (written on its line) when
+// it has any, otherwise its note's (taskGroupTags()). Nested tags count whole
 // (#area/work is not #area), and tags compare case-insensitively, like the
 // tag tree.
 
 export interface OpenTask<T> {
-	/** The note's tags, "#"-prefixed, as getAllTags() returns them. */
+	/** The tags that decide the task's group (see taskGroupTags()), "#"-prefixed. */
 	tags: string[];
 	/** The note's position in the list (0 = first, i.e. newest or pinned). */
 	noteIndex: number;
@@ -26,7 +27,29 @@ export interface TaskGroup<T> {
 	tasks: OpenTask<T>[];
 }
 
-/** A note's tag combination: its distinct tags sorted case-insensitively, and a key equal for any casing. */
+/** An inline tag as Obsidian indexes it: the tag ("#"-prefixed) and its 0-based line. */
+export interface LineTag {
+	tag: string;
+	line: number;
+}
+
+/**
+ * The tags of the note itself, for its tasks that carry none of their own:
+ * its frontmatter tags plus the inline tags written outside any task line.
+ * Tags on task lines belong to those tasks, so they're left out here; else a
+ * task without tags would also be grouped under its siblings' tags.
+ */
+export function noteLevelTags(frontmatterTags: string[], inlineTags: LineTag[], taskLines: ReadonlySet<number>): string[] {
+	return [...frontmatterTags, ...inlineTags.filter((t) => !taskLines.has(t.line)).map((t) => t.tag)];
+}
+
+/** The tags deciding a task's group: its own, written on its line, if it has any; otherwise the note's. */
+export function taskGroupTags(taskLine: number, inlineTags: LineTag[], noteTags: string[]): string[] {
+	const own = inlineTags.filter((t) => t.line === taskLine).map((t) => t.tag);
+	return own.length > 0 ? own : noteTags;
+}
+
+/** A tag combination: the distinct tags sorted case-insensitively, and a key equal for any casing. */
 export function tagCombination(tags: string[]): { key: string; tags: string[] } {
 	const sorted = uniqueTags(tags).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 	return { key: sorted.map((tag) => tag.toLowerCase()).join("\n"), tags: sorted };

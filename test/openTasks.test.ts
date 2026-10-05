@@ -1,5 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { groupOpenTasks, tagCombination, type OpenTask } from "../src/openTasks";
+import { groupOpenTasks, noteLevelTags, tagCombination, taskGroupTags, type OpenTask } from "../src/openTasks";
+
+describe("noteLevelTags", () => {
+	it("keeps frontmatter tags and inline tags off task lines, drops those on task lines", () => {
+		const inline = [
+			{ tag: "#project", line: 2 },
+			{ tag: "#urgent", line: 5 },
+		];
+		expect(noteLevelTags(["#work"], inline, new Set([5, 6]))).toEqual(["#work", "#project"]);
+	});
+});
+
+describe("taskGroupTags", () => {
+	const inline = [
+		{ tag: "#urgent", line: 5 },
+		{ tag: "#call", line: 5 },
+		{ tag: "#project", line: 2 },
+	];
+
+	it("uses the task's own tags when its line has any", () => {
+		expect(taskGroupTags(5, inline, ["#work"])).toEqual(["#urgent", "#call"]);
+	});
+
+	it("falls back to the note's tags for a task without its own", () => {
+		expect(taskGroupTags(6, inline, ["#work"])).toEqual(["#work"]);
+	});
+
+	it("leaves a task untagged when neither it nor the note has tags", () => {
+		expect(taskGroupTags(6, [], [])).toEqual([]);
+	});
+});
 
 const task = (tags: string[], noteIndex: number, line: number, text = `t${noteIndex}.${line}`): OpenTask<string> => ({
 	tags,

@@ -10,6 +10,7 @@ import {
 	TFile,
 	WorkspaceLeaf,
 	getAllTags,
+	parseFrontMatterTags,
 	setIcon,
 } from "obsidian";
 import type NotesListPlugin from "./main";
@@ -24,7 +25,7 @@ import {
 	UNTAGGED,
 	type TagFilter,
 } from "./tagTree";
-import { groupOpenTasks, type OpenTask } from "./openTasks";
+import { groupOpenTasks, noteLevelTags, taskGroupTags, type LineTag, type OpenTask } from "./openTasks";
 import {
 	countTasks,
 	isOpenTaskStatus,
@@ -903,13 +904,22 @@ export class NotesListView extends ItemView {
 		const collected = await Promise.all(
 			entries.map(async (entry, noteIndex): Promise<Array<OpenTask<NoteEntry>>> => {
 				if (entry.tasks.open === 0) return [];
-				const items = (this.app.metadataCache.getFileCache(entry.file)?.listItems ?? []).filter(
-					(item) => item.task !== undefined && isOpenTaskStatus(item.task)
-				);
+				const cache = this.app.metadataCache.getFileCache(entry.file);
+				const taskItems = (cache?.listItems ?? []).filter((item) => item.task !== undefined);
+				const items = taskItems.filter((item) => isOpenTaskStatus(item.task ?? ""));
 				if (items.length === 0) return [];
+				// Group by the task's own tags when it has some, else by the note's
+				// own (frontmatter, plus inline tags off any task line); both from
+				// Obsidian's index, so tags are recognized exactly as Obsidian does.
+				const inlineTags: LineTag[] = (cache?.tags ?? []).map((t) => ({ tag: t.tag, line: t.position.start.line }));
+				const noteTags = noteLevelTags(
+					parseFrontMatterTags(cache?.frontmatter) ?? [],
+					inlineTags,
+					new Set(taskItems.map((item) => item.position.start.line))
+				);
 				const lines = (await this.app.vault.cachedRead(entry.file)).split("\n");
 				return items.map((item) => ({
-					tags: entry.tags,
+					tags: taskGroupTags(item.position.start.line, inlineTags, noteTags),
 					noteIndex,
 					line: item.position.start.line,
 					text: stripInlineTags(taskLineText(lines[item.position.start.line] ?? "")).trim(),
