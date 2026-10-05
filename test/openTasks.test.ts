@@ -3,6 +3,7 @@ import {
 	groupOpenTasks,
 	noteLevelTags,
 	OpenTaskIndex,
+	splitByWaiting,
 	tagCombination,
 	tagsByLine,
 	taskGroupTags,
@@ -153,5 +154,19 @@ describe("OpenTaskIndex", () => {
 		index.prune(new Set());
 		await index.get([{ path: "a.md", version: 1 }]);
 		expect(extracted).toEqual(["a.md", "a.md"]);
+	});
+});
+
+describe("splitByWaiting", () => {
+	it("puts @waiting tasks in their own section, keeping the order of both", () => {
+		const tasks = [
+			task(["#a"], 0, 1, "call Anna"),
+			task(["#a"], 0, 2, "offer from Bob @waiting"),
+			task([], 1, 1, "write report"),
+			task([], 1, 3, "@Waiting reply"),
+		];
+		const { mine, waiting } = splitByWaiting(tasks);
+		expect(mine.map((t) => t.text)).toEqual(["call Anna", "write report"]);
+		expect(waiting.map((t) => t.text)).toEqual(["offer from Bob @waiting", "@Waiting reply"]);
 	});
 });

@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { countTasks, isOpenTaskStatus, setTaskLineChecked, taskLineText } from "../src/tasks";
+import { countTasks, hasWaitingKeyword, isOpenTaskStatus, setTaskLineChecked, taskLineText } from "../src/tasks";
+
+describe("hasWaitingKeyword", () => {
+	it("finds @waiting anywhere in the text, in any case", () => {
+		expect(hasWaitingKeyword("@waiting reply from Anna")).toBe(true);
+		expect(hasWaitingKeyword("send offer @Waiting")).toBe(true);
+		expect(hasWaitingKeyword("call (@waiting) back")).toBe(true);
+	});
+
+	it("needs the whole word", () => {
+		expect(hasWaitingKeyword("@waitingroom booked")).toBe(false);
+		expect(hasWaitingKeyword("mail me@waiting.com")).toBe(false);
+		expect(hasWaitingKeyword("@waiting-list")).toBe(false);
+		expect(hasWaitingKeyword("no keyword here")).toBe(false);
+	});
+});
 
 describe("isOpenTaskStatus", () => {
 	it("is open for a space and custom statuses, not for completed or cancelled", () => {

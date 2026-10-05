@@ -163,6 +163,37 @@
 /* Open tasks mode: one block per tag combination, its header styled like the
    date group headers, then the tasks as a Markdown task list, each ending
    with a small link to its note. */
+/* The open-tasks view's two sections ("To do", "Waiting for others"), each
+   holding its own tag groups. */
+.notes-list-task-section + .notes-list-task-section {
+	margin-top: var(--size-4-12);
+}
+
+.notes-list-task-section-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--size-4-2);
+	margin-bottom: var(--size-4-3);
+	padding-bottom: var(--size-4-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Larger than the tag groups' headers and in the accent color, so the two
+   sections stand out as the top level of the list. */
+.notes-list-view .notes-list-task-section-title {
+	margin: 0;
+	font-size: var(--h2-size);
+	color: var(--text-accent);
+	text-transform: uppercase;
+}
+
+.notes-list-task-section-count {
+	flex-shrink: 0;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
 .notes-list-task-group {
 	margin-bottom: var(--size-4-8);
 }
@@ -179,6 +210,11 @@
 	font-size: var(--font-ui-small);
 	font-weight: 600;
 	color: var(--text-normal);
+}
+
+.notes-list-task-group-separator {
+	font-weight: normal;
+	color: var(--text-muted);
 }
 
 .notes-list-task-group-count {

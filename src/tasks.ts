@@ -48,6 +48,15 @@ export function countTasks(listItems: TaskListItem[] | undefined): TaskCounts {
 // marker ("-", "*", "+", "1." or "1)"), then "[<status>]".
 const TASK_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[)([^\]])(\])/;
 
+/**
+ * Whether a task's text carries the "@waiting" keyword (case-insensitive, as
+ * a whole word: not "@waitingroom" or "x@waiting"): a task someone else has
+ * to do, shown in its own section of the open-tasks view.
+ */
+export function hasWaitingKeyword(text: string): boolean {
+	return /(^|[^\w@])@waiting(?![\w-])/i.test(text);
+}
+
 /** A task line's own text: no indentation, blockquote/callout or list marker, and no "[ ]" checkbox. */
 export function taskLineText(line: string): string {
 	const match = TASK_LINE.exec(line);

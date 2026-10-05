@@ -1,4 +1,5 @@
 import { uniqueTags } from "./tagTree";
+import { hasWaitingKeyword } from "./tasks";
 
 // The open-tasks view's grouping (see renderOpenTasks() in view.ts): every
 // open task goes under the exact combination of its tags, so tags #work and
@@ -131,6 +132,18 @@ function sameVersion(a: readonly unknown[], b: readonly unknown[]): boolean {
 export function tagCombination(tags: string[]): { key: string; tags: string[] } {
 	const sorted = uniqueTags(tags).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 	return { key: sorted.map((tag) => tag.toLowerCase()).join("\n"), tags: sorted };
+}
+
+/**
+ * The open-tasks view's two sections: tasks to do yourself, and tasks waiting
+ * on someone else (their text has the "@waiting" keyword, hasWaitingKeyword()).
+ * Each section is then grouped by tags on its own (groupOpenTasks()).
+ */
+export function splitByWaiting<T>(tasks: OpenTask<T>[]): { mine: OpenTask<T>[]; waiting: OpenTask<T>[] } {
+	const mine: OpenTask<T>[] = [];
+	const waiting: OpenTask<T>[] = [];
+	for (const task of tasks) (hasWaitingKeyword(task.text) ? waiting : mine).push(task);
+	return { mine, waiting };
 }
 
 // Groups sorted by their tags, alphabetically, with the untagged group last;

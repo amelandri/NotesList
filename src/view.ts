@@ -27,6 +27,7 @@ import {
 } from "./tagTree";
 import {
 	groupOpenTasks,
+	splitByWaiting,
 	noteLevelTags,
 	OpenTaskIndex,
 	tagsByLine,
@@ -34,6 +35,7 @@ import {
 	type IndexedTask,
 	type LineTag,
 	type OpenTask,
+	type TaskGroup,
 } from "./openTasks";
 import {
 	countTasks,
@@ -941,8 +943,7 @@ export class NotesListView extends ItemView {
 				collected.push({ ...task, noteIndex, note: entry });
 			}
 		});
-		const groups = groupOpenTasks(collected);
-		if (groups.length === 0) {
+		if (collected.length === 0) {
 			const filters = this.activeFilters();
 			listEl.createEl("p", {
 				text:
@@ -954,56 +955,85 @@ export class NotesListView extends ItemView {
 			return;
 		}
 
+		// Two sections, each grouped by tags on its own: tasks to do yourself,
+		// then those waiting on someone else ("@waiting"). An empty one is left
+		// out rather than shown with nothing under it.
+		const { mine, waiting } = splitByWaiting(collected);
 		const renders: Promise<void>[] = [];
-		for (const group of groups) {
-			const groupEl = listEl.createDiv({ cls: "notes-list-task-group" });
-			const header = groupEl.createDiv({ cls: "notes-list-task-group-header" });
-			header.createSpan({ text: group.tags.length > 0 ? group.tags.join(" + ") : t("tags.untagged") });
-			header.createSpan({ text: tn("tasksView.groupCount", group.tasks.length), cls: "notes-list-task-group-count" });
-			const body = groupEl.createDiv({ cls: "notes-list-content markdown-rendered" });
-			body.addEventListener("click", (evt) => {
-				const target = evt.target;
-				if (!(target instanceof HTMLInputElement) || !target.matches("input.task-list-item-checkbox")) return;
-				const own = Array.from(body.querySelectorAll("input.task-list-item-checkbox")).filter(
-					(el) => !el.closest(".internal-embed")
-				);
-				const task = group.tasks[own.indexOf(target)];
-				if (!task || target.closest(".internal-embed")) {
-					target.checked = !target.checked;
-					return;
-				}
-				void this.writeTaskState(task.note.file, task.line, target);
-			});
-			const markdown = group.tasks.map((task) => `- [ ] ${task.text}`).join("\n");
-			renders.push(
-				MarkdownRenderer.render(this.app, markdown, body, group.tasks[0].note.file.path, this.markdownComponent).then(
-					() => {
-						// The note each task comes from, as a link at the end of its row.
-						const rows = Array.from(body.querySelectorAll("li.task-list-item")).filter(
-							(li) => !li.closest(".internal-embed")
-						);
-						rows.forEach((row, index) => {
-							const task = group.tasks[index];
-							if (!task) return;
-							const { file, date } = task.note;
-							const label =
-								date.format("YYYY-MM-DD HH:mm") + (this.shouldShowNoteName(file) ? ` · ${file.basename}` : "");
-							const link = row.createEl("a", {
-								text: label,
-								cls: "notes-list-task-source internal-link",
-								href: file.path,
-								attr: { "aria-label": t("tasksView.openNote", { note: file.basename }) },
-							});
-							link.addEventListener("click", (evt) => {
-								evt.preventDefault();
-								void this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
-							});
-						});
-					}
-				)
-			);
+		for (const [titleKey, tasks] of [
+			["tasksView.sectionMine", mine],
+			["tasksView.sectionWaiting", waiting],
+		] as const) {
+			if (tasks.length === 0) continue;
+			const sectionEl = listEl.createDiv({ cls: "notes-list-task-section" });
+			const sectionHeader = sectionEl.createDiv({ cls: "notes-list-task-section-header" });
+			sectionHeader.createEl("h4", { text: t(titleKey), cls: "notes-list-task-section-title" });
+			sectionHeader.createSpan({ text: tn("tasksView.groupCount", tasks.length), cls: "notes-list-task-section-count" });
+			for (const group of groupOpenTasks(tasks)) {
+				renders.push(this.renderTaskGroup(sectionEl, group));
+			}
 		}
 		await Promise.all(renders);
+	}
+
+	// One tag group of the open-tasks view: its header (tags, count), then its
+	// tasks as one Markdown task list, so checkboxes, links and formatting are
+	// Obsidian's own, and the n-th checkbox is the group's n-th task, whose line
+	// is known exactly. Each row ends with a link to the task's note.
+	private renderTaskGroup(container: HTMLElement, group: TaskGroup<NoteEntry>): Promise<void> {
+		const groupEl = container.createDiv({ cls: "notes-list-task-group" });
+		const header = groupEl.createDiv({ cls: "notes-list-task-group-header" });
+		// Tags in bold (the header's weight), the " + " between them in its
+		// own span at normal weight, so the combination reads as tags.
+		const title = header.createSpan({ cls: "notes-list-task-group-title" });
+		if (group.tags.length === 0) title.setText(t("tags.untagged"));
+		group.tags.forEach((tag, i) => {
+			if (i > 0) title.createSpan({ text: " + ", cls: "notes-list-task-group-separator" });
+			title.createSpan({ text: tag });
+		});
+		header.createSpan({ text: tn("tasksView.groupCount", group.tasks.length), cls: "notes-list-task-group-count" });
+		const body = groupEl.createDiv({ cls: "notes-list-content markdown-rendered" });
+		body.addEventListener("click", (evt) => {
+			const target = evt.target;
+			if (!(target instanceof HTMLInputElement) || !target.matches("input.task-list-item-checkbox")) return;
+			const own = Array.from(body.querySelectorAll("input.task-list-item-checkbox")).filter(
+				(el) => !el.closest(".internal-embed")
+			);
+			const task = group.tasks[own.indexOf(target)];
+			if (!task || target.closest(".internal-embed")) {
+				target.checked = !target.checked;
+				return;
+			}
+			void this.writeTaskState(task.note.file, task.line, target);
+		});
+		const markdown = group.tasks.map((task) => `- [ ] ${task.text}`).join("\n");
+		return (
+			MarkdownRenderer.render(this.app, markdown, body, group.tasks[0].note.file.path, this.markdownComponent).then(
+				() => {
+					// The note each task comes from, as a link at the end of its row.
+					const rows = Array.from(body.querySelectorAll("li.task-list-item")).filter(
+						(li) => !li.closest(".internal-embed")
+					);
+					rows.forEach((row, index) => {
+						const task = group.tasks[index];
+						if (!task) return;
+						const { file, date } = task.note;
+						const label =
+							date.format("YYYY-MM-DD HH:mm") + (this.shouldShowNoteName(file) ? ` · ${file.basename}` : "");
+						const link = row.createEl("a", {
+							text: label,
+							cls: "notes-list-task-source internal-link",
+							href: file.path,
+							attr: { "aria-label": t("tasksView.openNote", { note: file.basename }) },
+						});
+						link.addEventListener("click", (evt) => {
+							evt.preventDefault();
+							void this.app.workspace.getLeaf(evt.ctrlKey || evt.metaKey).openFile(file);
+						});
+					});
+				}
+			)
+		);
 	}
 
 	// The sidebar's filter sections (today only Tags), all built the same way.
