@@ -91,7 +91,10 @@
 	   its margin. `top` is the same position (the layout's padding plus that
 	   offset), so the panel never moves at all while the list scrolls; a
 	   smaller `top` would let it slide up by the difference before sticking.
-	   The narrow layout has no panel at all (see there). */
+	   The narrow layout has no panel at all (see there).
+	   This is only the default: when the panel is taller than the pane (a long
+	   tag tree), updateSidebarPosition() in view.ts overrides `top` inline so
+	   the panel scrolls with the page until its end is reachable. */
 	--nl-sidebar-offset: calc(var(--nl-header-height) + var(--size-4-2));
 	margin-top: var(--nl-sidebar-offset);
 	top: calc(var(--size-4-4) + var(--nl-sidebar-offset));

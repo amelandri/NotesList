@@ -411,6 +411,14 @@ export class NotesListView extends ItemView {
 		(file) => [file.stat.mtime, this.app.metadataCache.getFileCache(file)]
 	);
 	private currentPage = 1;
+	// The two-column sidebar's sticky position (see updateSidebarPosition()).
+	// sidebarDefaultTop is the CSS `top` it starts at; sidebarTop the one
+	// currently applied, or null for the default; lastScrollTop the scroll
+	// position it was computed for, to get each scroll's delta.
+	private sidebarEl: HTMLElement | null = null;
+	private sidebarDefaultTop = 0;
+	private sidebarTop: number | null = null;
+	private lastScrollTop = 0;
 	// Full-text search (see searchIndex.ts). searchQuery is the submitted text
 	// (also what the input shows after a re-render, since render() rebuilds
 	// the whole DOM); searchMatches is the set of matching note paths, or null
@@ -485,6 +493,8 @@ export class NotesListView extends ItemView {
 		// Also re-renders when the threshold is crossed, for what render() itself
 		// sizes by layout (the number of page buttons), not just CSS.
 		const resizeObserver = new ResizeObserver(() => {
+			// The pane's height bounds how far a tall sidebar may scroll.
+			this.updateSidebarPosition();
 			const narrow = this.isNarrowLayout();
 			if (narrow === this.contentEl.hasClass("is-narrow")) return;
 			this.contentEl.toggleClass("is-narrow", narrow);
@@ -492,6 +502,7 @@ export class NotesListView extends ItemView {
 		});
 		resizeObserver.observe(this.contentEl);
 		this.register(() => resizeObserver.disconnect());
+		this.registerDomEvent(this.contentEl, "scroll", () => this.updateSidebarPosition());
 		this.registerEvent(
 			internalVault(this.app).on("config-changed", (key) => {
 				// Only affects the is-readable-line-width CSS class — no need to
@@ -504,6 +515,29 @@ export class NotesListView extends ItemView {
 
 	async onClose(): Promise<void> {
 		this.markdownComponent.unload();
+	}
+
+	// Keeps a sidebar taller than the pane fully reachable. A plain sticky `top`
+	// would pin its top edge, so whatever doesn't fit (the end of a long tag
+	// tree) could only be seen at the very end of the notes list. Instead the
+	// sticky `top` follows each scroll's delta, clamped between the default
+	// (top edge in place) and the value that puts the bottom edge at the pane's
+	// bottom: scrolling down, the sidebar moves with the page until its end is
+	// in view, then stays; scrolling up, likewise until its top is back. When
+	// it fits, both bounds are the default and nothing changes.
+	private updateSidebarPosition(): void {
+		const container = this.contentEl;
+		const scrollTop = container.scrollTop;
+		const delta = scrollTop - this.lastScrollTop;
+		this.lastScrollTop = scrollTop;
+		const panel = this.sidebarEl;
+		if (!panel?.isConnected || !panel.parentElement) return;
+		const bottomPadding = parseFloat(getComputedStyle(panel.parentElement).paddingBottom) || 0;
+		const maxTop = this.sidebarDefaultTop;
+		const minTop = Math.min(maxTop, container.clientHeight - bottomPadding - panel.offsetHeight);
+		const top = Math.min(maxTop, Math.max(minTop, (this.sidebarTop ?? maxTop) - delta));
+		this.sidebarTop = top === maxTop ? null : top;
+		panel.setCssStyles({ top: this.sidebarTop === null ? "" : `${top}px` });
 	}
 
 	private isNarrowLayout(): boolean {
@@ -583,6 +617,12 @@ export class NotesListView extends ItemView {
 
 	focusSearch(): void {
 		if (this.searchInputEl?.isConnected) {
+			// The field sits at the sidebar's top, which a tall sidebar may have
+			// scrolled out of view (see updateSidebarPosition()): bring it back.
+			if (this.sidebarTop !== null) {
+				this.sidebarTop = null;
+				this.sidebarEl?.setCssStyles({ top: "" });
+			}
 			this.searchInputEl.focus();
 			this.searchInputEl.select();
 		} else {
@@ -857,6 +897,15 @@ export class NotesListView extends ItemView {
 		]);
 
 		if (keepScroll) container.scrollTop = previousScrollTop;
+
+		// A fresh panel has no inline `top`, so this reads the CSS default. A
+		// render the user didn't ask for keeps the sidebar where it was; any
+		// other starts from the top, like the list.
+		this.sidebarEl = narrow ? null : sidebar;
+		if (!narrow) this.sidebarDefaultTop = parseFloat(getComputedStyle(sidebar).top) || 0;
+		if (!keepScroll) this.sidebarTop = null;
+		this.lastScrollTop = container.scrollTop;
+		this.updateSidebarPosition();
 
 		await Promise.all(noteRenders);
 

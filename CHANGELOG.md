@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - On phones, the end of the notes list and of the open tasks list is no longer hidden behind Obsidian's bottom toolbar: the view leaves room for it, as Obsidian's own views do.
+- A sidebar taller than the pane (a long tag list) can now be scrolled to its end: it moves with the page until its bottom is in view, then stays put, and scrolling back up brings its top back the same way. Before, it stayed fixed and the end of the tag list was only reachable at the very end of the notes list.
 
 ## [0.2.5] - 2026-10-04
 
