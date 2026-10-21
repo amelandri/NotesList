@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_No unreleased changes yet._
+
+## [0.3.0] - 2026-10-21
+
 ### Added
 
 - `@keywords` in tasks (e.g. `@waiting`, `@anna`) are highlighted in an orange tuned to the accent color, in the notes list and in the "Open tasks" view. The color can be changed through `--notes-list-keyword-color`.
@@ -166,7 +170,8 @@ Initial release.
 - Double-clicking a note's content opens the note.
 - The notes column follows Obsidian's "Readable line length" setting.
 
-[Unreleased]: https://github.com/amelandri/NotesList/compare/0.2.5...HEAD
+[Unreleased]: https://github.com/amelandri/NotesList/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/amelandri/NotesList/compare/0.2.5...0.3.0
 [0.2.5]: https://github.com/amelandri/NotesList/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/amelandri/NotesList/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/amelandri/NotesList/compare/0.2.2...0.2.3
