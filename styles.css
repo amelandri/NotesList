@@ -142,7 +142,7 @@
 .notes-list-mode-switch .notes-list-mode-button {
 	height: 100%;
 	padding: 0 var(--size-4-3);
-	border-radius: var(--radius-s);
+	border-radius: var(--radius-m);
 	background: transparent;
 	box-shadow: none;
 	color: var(--text-muted);
